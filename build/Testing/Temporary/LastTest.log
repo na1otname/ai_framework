@@ -1,0 +1,51 @@
+Start testing: Jul 19 15:37 CST
+----------------------------------------------------------
+1/1 Testing: OpenMMLabTest
+1/1 Test: OpenMMLabTest
+Command: "/home/orangepi/Code/Openmmlab/build/test/test_openmmlab"
+Directory: /home/orangepi/Code/Openmmlab/build/test
+"OpenMMLabTest" start time: Jul 19 15:37 CST
+Output:
+----------------------------------------------------------
+environment variable SPDLOG_STDOUT is not set, and set true
+environment variable SPDLOG_SYSTEMD is not set, and set false
+environment variable SPDLOG_LEVEL is not set, and set default level
+[INFO] rknn_init success!
+[INFO] RKNN API version: %s
+[INFO] RKNN Driver version: %s
+[INFO] model input num: %d, output num: %d
+[INFO] Rk3588 init success!
+[INFO] Rk3588::BindInputAndOutput
+[INFO] === AiInstance Layer Info ===
+[INFO]   Input[%d]: name=%s
+[INFO]     shape: %s
+[INFO]     elements: %zu
+[INFO]     scale: %f, zp: %d
+[INFO]   Output[%d]: name=%s
+[INFO]     shape: %s
+[INFO]     elements: %zu
+[INFO]   Output[%d]: name=%s
+[INFO]     shape: %s
+[INFO]     elements: %zu
+[INFO]   Output[%d]: name=%s
+[INFO]     shape: %s
+[INFO]     elements: %zu
+[INFO]   Output[%d]: name=%s
+[INFO]     shape: %s
+[INFO]     elements: %zu
+[INFO]   Output[%d]: name=%s
+[INFO]     shape: %s
+[INFO]     elements: %zu
+[INFO]   Output[%d]: name=%s
+[INFO]     shape: %s
+[INFO]     elements: %zu
+[INFO] ==============================
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"OpenMMLabTest" end time: Jul 19 15:37 CST
+"OpenMMLabTest" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Jul 19 15:37 CST
