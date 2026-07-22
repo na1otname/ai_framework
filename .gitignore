@@ -5,7 +5,8 @@ __pycache__/
 *.so
 .venv/
 env/
-
+build/
+bin/
 # IDE 与编辑器
 .vscode/
 .idea/

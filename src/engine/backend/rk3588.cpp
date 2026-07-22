@@ -253,52 +253,56 @@ bool Rk3588::QueryAndConfigureRuntime()
 
 void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
 {
-    auto **input_mem = tensor_data.get_input_rknn_tensor_mem_ptr();
-    auto **output_mem = tensor_data.get_output_rknn_tensor_mem_ptr();
 
-    for (uint32_t i = 0; i < tensor_data.get_input_tensor_count(); ++i)
+    if (zero_copy_)
     {
-        // 分配零拷贝输入内存
-        input_mem[i] = rknn_create_mem(ctx_, input_attr_[i].size_with_stride);
-        if (input_mem[i] == nullptr)
-        {
-            LOG_ERROR("rknn_create_mem(input[{}], size={}) failed!", i, input_attr_[i].size_with_stride);
-            continue;
-        }
-        int ret = rknn_set_io_mem(ctx_, input_mem[i], &input_attr_[i]);
-        if (ret < 0)
-        {
-            LOG_ERROR("rknn_set_io_mem(input[{}]) fail! ret={}", i, ret);
-            continue;
-        }
-        LOG_INFO("zero-copy input mem[{}]: virt={} fd={} size={} fmt={}",
-                 i,
-                 input_mem[i]->virt_addr,
-                 input_mem[i]->fd,
-                 input_attr_[i].size_with_stride,
-                 input_attr_[i].fmt);
-    }
+        auto **input_mem = tensor_data.get_input_rknn_tensor_mem_ptr();
+        auto **output_mem = tensor_data.get_output_rknn_tensor_mem_ptr();
 
-    for (uint32_t i = 0; i < tensor_data.get_output_tensor_count(); ++i)
-    {
-        // 分配零拷贝输出内存
-        output_mem[i] = rknn_create_mem(ctx_, output_attr_[i].size_with_stride);
-        if (output_mem[i] == nullptr)
+        for (uint32_t i = 0; i < tensor_data.get_input_tensor_count(); ++i)
         {
-            LOG_ERROR("rknn_create_mem(output[{}], size={}) failed!", i, output_attr_[i].size_with_stride);
-            continue;
+            // 分配零拷贝输入内存
+            input_mem[i] = rknn_create_mem(ctx_, input_attr_[i].size_with_stride);
+            if (input_mem[i] == nullptr)
+            {
+                LOG_ERROR("rknn_create_mem(input[{}], size={}) failed!", i, input_attr_[i].size_with_stride);
+                continue;
+            }
+            int ret = rknn_set_io_mem(ctx_, input_mem[i], &input_attr_[i]);
+            if (ret < 0)
+            {
+                LOG_ERROR("rknn_set_io_mem(input[{}]) fail! ret={}", i, ret);
+                continue;
+            }
+            LOG_INFO("zero-copy input mem[{}]: virt={} fd={} size={} fmt={}",
+                     i,
+                     input_mem[i]->virt_addr,
+                     input_mem[i]->fd,
+                     input_attr_[i].size_with_stride,
+                     input_attr_[i].fmt);
         }
-        int ret = rknn_set_io_mem(ctx_, output_mem[i], &output_attr_[i]);
-        if (ret < 0)
+
+        for (uint32_t i = 0; i < tensor_data.get_output_tensor_count(); ++i)
         {
-            LOG_ERROR("rknn_set_io_mem(output[{}]) fail! ret={}", i, ret);
-            continue;
+            // 分配零拷贝输出内存
+            output_mem[i] = rknn_create_mem(ctx_, output_attr_[i].size_with_stride);
+            if (output_mem[i] == nullptr)
+            {
+                LOG_ERROR("rknn_create_mem(output[{}], size={}) failed!", i, output_attr_[i].size_with_stride);
+                continue;
+            }
+            int ret = rknn_set_io_mem(ctx_, output_mem[i], &output_attr_[i]);
+            if (ret < 0)
+            {
+                LOG_ERROR("rknn_set_io_mem(output[{}]) fail! ret={}", i, ret);
+                continue;
+            }
+            LOG_INFO("zero-copy output mem[{}]: virt={} fd={} size={}",
+                     i,
+                     output_mem[i]->virt_addr,
+                     output_mem[i]->fd,
+                     output_attr_[i].size_with_stride);
         }
-        LOG_INFO("zero-copy output mem[{}]: virt={} fd={} size={}",
-                 i,
-                 output_mem[i]->virt_addr,
-                 output_mem[i]->fd,
-                 output_attr_[i].size_with_stride);
     }
 }
 
