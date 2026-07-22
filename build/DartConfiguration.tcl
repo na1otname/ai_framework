@@ -4,8 +4,8 @@
 
 
 # Configuration directories and files
-SourceDirectory: /home/orangepi/Code/Openmmlab
-BuildDirectory: /home/orangepi/Code/Openmmlab/build
+SourceDirectory: /home/orangepi/Code/ai_framework
+BuildDirectory: /home/orangepi/Code/ai_framework/build
 
 # Where to place the cost data store
 CostDataFile: 
@@ -14,7 +14,7 @@ CostDataFile:
 Site: orangepi5
 
 # Build name is osname-revision-compiler, i.e. Linux-2.4.2-2smp-c++
-BuildName: Linux-c++
+BuildName: Linux-aarch64-linux-gnu-g++
 
 # Subprojects
 LabelsForSubprojects: 
@@ -27,7 +27,7 @@ SubmitInactivityTimeout:
 NightlyStartTime: 00:00:00 EDT
 
 # Commands for the build/test/submit cycle
-ConfigureCommand: "/usr/local/bin/cmake" "/home/orangepi/Code/Openmmlab"
+ConfigureCommand: "/usr/local/bin/cmake" "/home/orangepi/Code/ai_framework"
 MakeCommand: /usr/local/bin/cmake --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 
@@ -45,7 +45,7 @@ SVNOptions:
 SVNUpdateOptions: 
 
 # Git options
-GITCommand: 
+GITCommand: /usr/bin/git
 GITInitSubmodules: 
 GITUpdateOptions: 
 GITUpdateCustom: 
@@ -58,12 +58,12 @@ P4UpdateOptions:
 P4UpdateCustom: 
 
 # Generic update command
-UpdateCommand: 
+UpdateCommand: /usr/bin/git
 UpdateOptions: 
-UpdateType: 
+UpdateType: git
 
 # Compiler info
-Compiler: /usr/bin/c++
+Compiler: /usr/bin/aarch64-linux-gnu-g++
 CompilerVersion: 11.4.0
 
 # Dynamic analysis (MemCheck)

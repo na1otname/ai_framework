@@ -7,6 +7,6 @@
 int main()
 {
     auto instance = ai_framework::Engine(ai_framework::RKNN_FORMAT,
-                                         "/home/orangepi/Code/Openmmlab/model/rtmpose-m_8xb256_hand_finetune_pow-fp16.rknn");
+                                         "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320-fp16.rknn");
     return 0;
 }

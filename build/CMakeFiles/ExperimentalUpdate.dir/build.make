@@ -53,10 +53,10 @@ RM = /usr/local/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/orangepi/Code/Openmmlab
+CMAKE_SOURCE_DIR = /home/orangepi/Code/ai_framework
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/orangepi/Code/Openmmlab/build
+CMAKE_BINARY_DIR = /home/orangepi/Code/ai_framework/build
 
 # Utility rule file for ExperimentalUpdate.
 
@@ -82,6 +82,6 @@ CMakeFiles/ExperimentalUpdate.dir/clean:
 .PHONY : CMakeFiles/ExperimentalUpdate.dir/clean
 
 CMakeFiles/ExperimentalUpdate.dir/depend:
-	cd /home/orangepi/Code/Openmmlab/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/orangepi/Code/Openmmlab /home/orangepi/Code/Openmmlab /home/orangepi/Code/Openmmlab/build /home/orangepi/Code/Openmmlab/build /home/orangepi/Code/Openmmlab/build/CMakeFiles/ExperimentalUpdate.dir/DependInfo.cmake "--color=$(COLOR)"
+	cd /home/orangepi/Code/ai_framework/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/orangepi/Code/ai_framework /home/orangepi/Code/ai_framework /home/orangepi/Code/ai_framework/build /home/orangepi/Code/ai_framework/build /home/orangepi/Code/ai_framework/build/CMakeFiles/ExperimentalUpdate.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : CMakeFiles/ExperimentalUpdate.dir/depend
 

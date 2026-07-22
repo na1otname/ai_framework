@@ -7,13 +7,13 @@ set(CMAKE_DEPENDS_GENERATOR "Unix Makefiles")
 # The top level Makefile was generated from the following files:
 set(CMAKE_MAKEFILE_DEPENDS
   "CMakeCache.txt"
-  "/home/orangepi/Code/Openmmlab/CMakeLists.txt"
+  "/home/orangepi/Code/ai_framework/CMakeLists.txt"
   "CMakeFiles/3.30.0-rc2/CMakeCCompiler.cmake"
   "CMakeFiles/3.30.0-rc2/CMakeCXXCompiler.cmake"
   "CMakeFiles/3.30.0-rc2/CMakeSystem.cmake"
-  "/home/orangepi/Code/Openmmlab/src/CMakeLists.txt"
-  "/home/orangepi/Code/Openmmlab/src/engine/CMakeLists.txt"
-  "/home/orangepi/Code/Openmmlab/test/CMakeLists.txt"
+  "/home/orangepi/Code/ai_framework/src/CMakeLists.txt"
+  "/home/orangepi/Code/ai_framework/src/engine/CMakeLists.txt"
+  "/home/orangepi/Code/ai_framework/test/CMakeLists.txt"
   "/usr/local/lib/cmake/opencv4/OpenCVConfig-version.cmake"
   "/usr/local/lib/cmake/opencv4/OpenCVConfig.cmake"
   "/usr/local/lib/cmake/opencv4/OpenCVModules-release.cmake"
@@ -94,7 +94,7 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/ContinuousCoverage.dir/DependInfo.cmake"
   "CMakeFiles/ContinuousMemCheck.dir/DependInfo.cmake"
   "CMakeFiles/ContinuousSubmit.dir/DependInfo.cmake"
-  "test/CMakeFiles/test_openmmlab.dir/DependInfo.cmake"
-  "src/CMakeFiles/OpenMMLab.dir/DependInfo.cmake"
+  "test/CMakeFiles/test_ai_framework.dir/DependInfo.cmake"
+  "src/CMakeFiles/ai_framework.dir/DependInfo.cmake"
   "src/engine/CMakeFiles/engine.dir/DependInfo.cmake"
   )

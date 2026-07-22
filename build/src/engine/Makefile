@@ -57,10 +57,10 @@ RM = /usr/local/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/orangepi/Code/Openmmlab
+CMAKE_SOURCE_DIR = /home/orangepi/Code/ai_framework
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/orangepi/Code/Openmmlab/build
+CMAKE_BINARY_DIR = /home/orangepi/Code/ai_framework/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -68,7 +68,7 @@ CMAKE_BINARY_DIR = /home/orangepi/Code/Openmmlab/build
 # Special rule for the target package
 package: preinstall
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Run CPack packaging tool..."
-	cd /home/orangepi/Code/Openmmlab/build && /usr/local/bin/cpack --config ./CPackConfig.cmake
+	cd /home/orangepi/Code/ai_framework/build && /usr/local/bin/cpack --config ./CPackConfig.cmake
 .PHONY : package
 
 # Special rule for the target package
@@ -78,7 +78,7 @@ package/fast: package
 # Special rule for the target package_source
 package_source:
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Run CPack packaging tool for source..."
-	cd /home/orangepi/Code/Openmmlab/build && /usr/local/bin/cpack --config ./CPackSourceConfig.cmake /home/orangepi/Code/Openmmlab/build/CPackSourceConfig.cmake
+	cd /home/orangepi/Code/ai_framework/build && /usr/local/bin/cpack --config ./CPackSourceConfig.cmake /home/orangepi/Code/ai_framework/build/CPackSourceConfig.cmake
 .PHONY : package_source
 
 # Special rule for the target package_source
@@ -117,14 +117,14 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	cd /home/orangepi/Code/Openmmlab/build && $(CMAKE_COMMAND) -E cmake_progress_start /home/orangepi/Code/Openmmlab/build/CMakeFiles /home/orangepi/Code/Openmmlab/build/src/engine//CMakeFiles/progress.marks
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/orangepi/Code/Openmmlab/build/CMakeFiles 0
+	cd /home/orangepi/Code/ai_framework/build && $(CMAKE_COMMAND) -E cmake_progress_start /home/orangepi/Code/ai_framework/build/CMakeFiles /home/orangepi/Code/ai_framework/build/src/engine//CMakeFiles/progress.marks
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/orangepi/Code/ai_framework/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/clean
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/clean
 .PHONY : clean
 
 # The main clean target
@@ -133,22 +133,22 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/preinstall
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/preinstall
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd /home/orangepi/Code/Openmmlab/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /home/orangepi/Code/ai_framework/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
 # Convenience name for target.
 src/engine/CMakeFiles/engine.dir/rule:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/CMakeFiles/engine.dir/rule
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/engine/CMakeFiles/engine.dir/rule
 .PHONY : src/engine/CMakeFiles/engine.dir/rule
 
 # Convenience name for target.
@@ -157,7 +157,7 @@ engine: src/engine/CMakeFiles/engine.dir/rule
 
 # fast build rule for target.
 engine/fast:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/build
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/build
 .PHONY : engine/fast
 
 ai_framework.o: ai_framework.cpp.o
@@ -165,7 +165,7 @@ ai_framework.o: ai_framework.cpp.o
 
 # target to build an object file
 ai_framework.cpp.o:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o
 .PHONY : ai_framework.cpp.o
 
 ai_framework.i: ai_framework.cpp.i
@@ -173,7 +173,7 @@ ai_framework.i: ai_framework.cpp.i
 
 # target to preprocess a source file
 ai_framework.cpp.i:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_framework.cpp.i
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_framework.cpp.i
 .PHONY : ai_framework.cpp.i
 
 ai_framework.s: ai_framework.cpp.s
@@ -181,7 +181,7 @@ ai_framework.s: ai_framework.cpp.s
 
 # target to generate assembly for a file
 ai_framework.cpp.s:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_framework.cpp.s
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_framework.cpp.s
 .PHONY : ai_framework.cpp.s
 
 ai_instance.o: ai_instance.cpp.o
@@ -189,7 +189,7 @@ ai_instance.o: ai_instance.cpp.o
 
 # target to build an object file
 ai_instance.cpp.o:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o
 .PHONY : ai_instance.cpp.o
 
 ai_instance.i: ai_instance.cpp.i
@@ -197,7 +197,7 @@ ai_instance.i: ai_instance.cpp.i
 
 # target to preprocess a source file
 ai_instance.cpp.i:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_instance.cpp.i
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_instance.cpp.i
 .PHONY : ai_instance.cpp.i
 
 ai_instance.s: ai_instance.cpp.s
@@ -205,7 +205,7 @@ ai_instance.s: ai_instance.cpp.s
 
 # target to generate assembly for a file
 ai_instance.cpp.s:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_instance.cpp.s
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/ai_instance.cpp.s
 .PHONY : ai_instance.cpp.s
 
 backend/rk3588.o: backend/rk3588.cpp.o
@@ -213,7 +213,7 @@ backend/rk3588.o: backend/rk3588.cpp.o
 
 # target to build an object file
 backend/rk3588.cpp.o:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o
 .PHONY : backend/rk3588.cpp.o
 
 backend/rk3588.i: backend/rk3588.cpp.i
@@ -221,7 +221,7 @@ backend/rk3588.i: backend/rk3588.cpp.i
 
 # target to preprocess a source file
 backend/rk3588.cpp.i:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.i
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.i
 .PHONY : backend/rk3588.cpp.i
 
 backend/rk3588.s: backend/rk3588.cpp.s
@@ -229,7 +229,7 @@ backend/rk3588.s: backend/rk3588.cpp.s
 
 # target to generate assembly for a file
 backend/rk3588.cpp.s:
-	cd /home/orangepi/Code/Openmmlab/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.s
+	cd /home/orangepi/Code/ai_framework/build && $(MAKE) $(MAKESILENT) -f src/engine/CMakeFiles/engine.dir/build.make src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.s
 .PHONY : backend/rk3588.cpp.s
 
 # Help Target
@@ -264,6 +264,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd /home/orangepi/Code/Openmmlab/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /home/orangepi/Code/ai_framework/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

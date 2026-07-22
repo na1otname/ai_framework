@@ -1,4 +1,4 @@
-# Install script for directory: /home/orangepi/Code/Openmmlab/src
+# Install script for directory: /home/orangepi/Code/ai_framework/src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -44,7 +44,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/orangepi/Code/Openmmlab/build/src/engine/cmake_install.cmake")
+  include("/home/orangepi/Code/ai_framework/build/src/engine/cmake_install.cmake")
 
 endif()
 

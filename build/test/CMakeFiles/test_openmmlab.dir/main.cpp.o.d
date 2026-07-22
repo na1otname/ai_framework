@@ -1,6 +1,6 @@
 test/CMakeFiles/test_openmmlab.dir/main.cpp.o: \
- /home/orangepi/Code/Openmmlab/test/main.cpp /usr/include/stdc-predef.h \
- /usr/include/c++/11/cassert \
+ /home/orangepi/Code/ai_framework/test/main.cpp \
+ /usr/include/stdc-predef.h /usr/include/c++/11/cassert \
  /usr/include/aarch64-linux-gnu/c++/11/bits/c++config.h \
  /usr/include/aarch64-linux-gnu/c++/11/bits/os_defines.h \
  /usr/include/features.h /usr/include/features-time64.h \
@@ -37,7 +37,7 @@ test/CMakeFiles/test_openmmlab.dir/main.cpp.o: \
  /usr/include/strings.h \
  /usr/include/aarch64-linux-gnu/bits/strings_fortified.h \
  /usr/include/aarch64-linux-gnu/bits/string_fortified.h \
- /home/orangepi/Code/Openmmlab/src/engine/ai_instance.h \
+ /home/orangepi/Code/ai_framework/src/engine/ai_instance.h \
  /usr/include/c++/11/cstdint \
  /usr/lib/gcc/aarch64-linux-gnu/11/include/stdint.h /usr/include/stdint.h \
  /usr/include/aarch64-linux-gnu/bits/wchar.h \
@@ -167,7 +167,7 @@ test/CMakeFiles/test_openmmlab.dir/main.cpp.o: \
  /usr/include/c++/11/bits/stl_vector.h \
  /usr/include/c++/11/bits/stl_bvector.h \
  /usr/include/c++/11/bits/vector.tcc /usr/include/c++/11/stdexcept \
- /home/orangepi/Code/Openmmlab/src/utils/logger.h \
+ /home/orangepi/Code/ai_framework/src/utils/logger.h \
  /usr/include/fmt/format.h /usr/include/c++/11/cmath /usr/include/math.h \
  /usr/include/aarch64-linux-gnu/bits/math-vector.h \
  /usr/include/aarch64-linux-gnu/bits/libm-simd-decl-stubs.h \

@@ -1,7 +1,7 @@
 src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o: \
- /home/orangepi/Code/Openmmlab/src/engine/ai_instance.cpp \
+ /home/orangepi/Code/ai_framework/src/engine/ai_instance.cpp \
  /usr/include/stdc-predef.h \
- /home/orangepi/Code/Openmmlab/src/engine/ai_instance.h \
+ /home/orangepi/Code/ai_framework/src/engine/ai_instance.h \
  /usr/include/c++/11/cstdint \
  /usr/include/aarch64-linux-gnu/c++/11/bits/c++config.h \
  /usr/include/aarch64-linux-gnu/c++/11/bits/os_defines.h \
@@ -163,7 +163,7 @@ src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o: \
  /usr/include/c++/11/bits/stl_vector.h \
  /usr/include/c++/11/bits/stl_bvector.h \
  /usr/include/c++/11/bits/vector.tcc /usr/include/c++/11/stdexcept \
- /home/orangepi/Code/Openmmlab/src/utils/logger.h \
+ /home/orangepi/Code/ai_framework/src/utils/logger.h \
  /usr/include/fmt/format.h /usr/include/c++/11/cmath /usr/include/math.h \
  /usr/include/aarch64-linux-gnu/bits/math-vector.h \
  /usr/include/aarch64-linux-gnu/bits/libm-simd-decl-stubs.h \
@@ -296,13 +296,13 @@ src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o: \
  /usr/include/systemd/sd-id128.h /usr/include/systemd/_sd-common.h \
  /usr/include/spdlog/spdlog.h /usr/include/spdlog/version.h \
  /usr/include/spdlog/spdlog-inl.h \
- /home/orangepi/Code/Openmmlab/third_party/rknn/Linux/librknn_api/include/rknn_api.h \
- /home/orangepi/Code/Openmmlab/src/engine/ai_framework.h \
- /home/orangepi/Code/Openmmlab/src/engine/backend/rk3588.h \
- /home/orangepi/Code/Openmmlab/src/utils/engine_helper.h \
+ /home/orangepi/Code/ai_framework/third_party/rknn/Linux/librknn_api/include/rknn_api.h \
+ /home/orangepi/Code/ai_framework/src/engine/ai_framework.h \
+ /home/orangepi/Code/ai_framework/src/engine/backend/rk3588.h \
+ /home/orangepi/Code/ai_framework/src/utils/engine_helper.h \
  /usr/include/c++/11/fstream /usr/include/c++/11/bits/codecvt.h \
  /usr/include/aarch64-linux-gnu/c++/11/bits/basic_file.h \
  /usr/include/aarch64-linux-gnu/c++/11/bits/c++io.h \
  /usr/include/c++/11/bits/fstream.tcc \
- /home/orangepi/Code/Openmmlab/src/types/datatype.h \
- /home/orangepi/Code/Openmmlab/src/engine/ai_framework.h
+ /home/orangepi/Code/ai_framework/src/types/datatype.h \
+ /home/orangepi/Code/ai_framework/src/engine/ai_framework.h

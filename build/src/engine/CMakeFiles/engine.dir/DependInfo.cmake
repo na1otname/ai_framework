@@ -8,9 +8,9 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/orangepi/Code/Openmmlab/src/engine/ai_framework.cpp" "src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o" "gcc" "src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o.d"
-  "/home/orangepi/Code/Openmmlab/src/engine/ai_instance.cpp" "src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o" "gcc" "src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o.d"
-  "/home/orangepi/Code/Openmmlab/src/engine/backend/rk3588.cpp" "src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o" "gcc" "src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o.d"
+  "/home/orangepi/Code/ai_framework/src/engine/ai_framework.cpp" "src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o" "gcc" "src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o.d"
+  "/home/orangepi/Code/ai_framework/src/engine/ai_instance.cpp" "src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o" "gcc" "src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o.d"
+  "/home/orangepi/Code/ai_framework/src/engine/backend/rk3588.cpp" "src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o" "gcc" "src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

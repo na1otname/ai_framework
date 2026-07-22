@@ -53,10 +53,10 @@ RM = /usr/local/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/orangepi/Code/Openmmlab
+CMAKE_SOURCE_DIR = /home/orangepi/Code/ai_framework
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/orangepi/Code/Openmmlab/build
+CMAKE_BINARY_DIR = /home/orangepi/Code/ai_framework/build
 
 # Include any dependencies generated for this target.
 include src/engine/CMakeFiles/engine.dir/depend.make
@@ -70,46 +70,46 @@ include src/engine/CMakeFiles/engine.dir/progress.make
 include src/engine/CMakeFiles/engine.dir/flags.make
 
 src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o: src/engine/CMakeFiles/engine.dir/flags.make
-src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o: /home/orangepi/Code/Openmmlab/src/engine/ai_framework.cpp
+src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o: /home/orangepi/Code/ai_framework/src/engine/ai_framework.cpp
 src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o: src/engine/CMakeFiles/engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/orangepi/Code/Openmmlab/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o -MF CMakeFiles/engine.dir/ai_framework.cpp.o.d -o CMakeFiles/engine.dir/ai_framework.cpp.o -c /home/orangepi/Code/Openmmlab/src/engine/ai_framework.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/orangepi/Code/ai_framework/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o"
+	cd /home/orangepi/Code/ai_framework/build/src/engine && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o -MF CMakeFiles/engine.dir/ai_framework.cpp.o.d -o CMakeFiles/engine.dir/ai_framework.cpp.o -c /home/orangepi/Code/ai_framework/src/engine/ai_framework.cpp
 
 src/engine/CMakeFiles/engine.dir/ai_framework.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/engine.dir/ai_framework.cpp.i"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/orangepi/Code/Openmmlab/src/engine/ai_framework.cpp > CMakeFiles/engine.dir/ai_framework.cpp.i
+	cd /home/orangepi/Code/ai_framework/build/src/engine && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/orangepi/Code/ai_framework/src/engine/ai_framework.cpp > CMakeFiles/engine.dir/ai_framework.cpp.i
 
 src/engine/CMakeFiles/engine.dir/ai_framework.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/engine.dir/ai_framework.cpp.s"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/orangepi/Code/Openmmlab/src/engine/ai_framework.cpp -o CMakeFiles/engine.dir/ai_framework.cpp.s
+	cd /home/orangepi/Code/ai_framework/build/src/engine && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/orangepi/Code/ai_framework/src/engine/ai_framework.cpp -o CMakeFiles/engine.dir/ai_framework.cpp.s
 
 src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o: src/engine/CMakeFiles/engine.dir/flags.make
-src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o: /home/orangepi/Code/Openmmlab/src/engine/ai_instance.cpp
+src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o: /home/orangepi/Code/ai_framework/src/engine/ai_instance.cpp
 src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o: src/engine/CMakeFiles/engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/orangepi/Code/Openmmlab/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o -MF CMakeFiles/engine.dir/ai_instance.cpp.o.d -o CMakeFiles/engine.dir/ai_instance.cpp.o -c /home/orangepi/Code/Openmmlab/src/engine/ai_instance.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/orangepi/Code/ai_framework/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o"
+	cd /home/orangepi/Code/ai_framework/build/src/engine && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o -MF CMakeFiles/engine.dir/ai_instance.cpp.o.d -o CMakeFiles/engine.dir/ai_instance.cpp.o -c /home/orangepi/Code/ai_framework/src/engine/ai_instance.cpp
 
 src/engine/CMakeFiles/engine.dir/ai_instance.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/engine.dir/ai_instance.cpp.i"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/orangepi/Code/Openmmlab/src/engine/ai_instance.cpp > CMakeFiles/engine.dir/ai_instance.cpp.i
+	cd /home/orangepi/Code/ai_framework/build/src/engine && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/orangepi/Code/ai_framework/src/engine/ai_instance.cpp > CMakeFiles/engine.dir/ai_instance.cpp.i
 
 src/engine/CMakeFiles/engine.dir/ai_instance.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/engine.dir/ai_instance.cpp.s"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/orangepi/Code/Openmmlab/src/engine/ai_instance.cpp -o CMakeFiles/engine.dir/ai_instance.cpp.s
+	cd /home/orangepi/Code/ai_framework/build/src/engine && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/orangepi/Code/ai_framework/src/engine/ai_instance.cpp -o CMakeFiles/engine.dir/ai_instance.cpp.s
 
 src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o: src/engine/CMakeFiles/engine.dir/flags.make
-src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o: /home/orangepi/Code/Openmmlab/src/engine/backend/rk3588.cpp
+src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o: /home/orangepi/Code/ai_framework/src/engine/backend/rk3588.cpp
 src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o: src/engine/CMakeFiles/engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/orangepi/Code/Openmmlab/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o -MF CMakeFiles/engine.dir/backend/rk3588.cpp.o.d -o CMakeFiles/engine.dir/backend/rk3588.cpp.o -c /home/orangepi/Code/Openmmlab/src/engine/backend/rk3588.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/orangepi/Code/ai_framework/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o"
+	cd /home/orangepi/Code/ai_framework/build/src/engine && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o -MF CMakeFiles/engine.dir/backend/rk3588.cpp.o.d -o CMakeFiles/engine.dir/backend/rk3588.cpp.o -c /home/orangepi/Code/ai_framework/src/engine/backend/rk3588.cpp
 
 src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/engine.dir/backend/rk3588.cpp.i"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/orangepi/Code/Openmmlab/src/engine/backend/rk3588.cpp > CMakeFiles/engine.dir/backend/rk3588.cpp.i
+	cd /home/orangepi/Code/ai_framework/build/src/engine && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/orangepi/Code/ai_framework/src/engine/backend/rk3588.cpp > CMakeFiles/engine.dir/backend/rk3588.cpp.i
 
 src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/engine.dir/backend/rk3588.cpp.s"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/orangepi/Code/Openmmlab/src/engine/backend/rk3588.cpp -o CMakeFiles/engine.dir/backend/rk3588.cpp.s
+	cd /home/orangepi/Code/ai_framework/build/src/engine && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/orangepi/Code/ai_framework/src/engine/backend/rk3588.cpp -o CMakeFiles/engine.dir/backend/rk3588.cpp.s
 
 # Object files for target engine
 engine_OBJECTS = \
@@ -120,25 +120,25 @@ engine_OBJECTS = \
 # External object files for target engine
 engine_EXTERNAL_OBJECTS =
 
-/home/orangepi/Code/Openmmlab/bin/libengine.so: src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o
-/home/orangepi/Code/Openmmlab/bin/libengine.so: src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o
-/home/orangepi/Code/Openmmlab/bin/libengine.so: src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o
-/home/orangepi/Code/Openmmlab/bin/libengine.so: src/engine/CMakeFiles/engine.dir/build.make
-/home/orangepi/Code/Openmmlab/bin/libengine.so: /home/orangepi/Code/Openmmlab/third_party/rknn/Linux/librknn_api/aarch64/librknnrt.so
-/home/orangepi/Code/Openmmlab/bin/libengine.so: /home/orangepi/Code/Openmmlab/third_party/rga/libs/Linux/gcc-aarch64/librga.so
-/home/orangepi/Code/Openmmlab/bin/libengine.so: src/engine/CMakeFiles/engine.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/orangepi/Code/Openmmlab/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX shared library /home/orangepi/Code/Openmmlab/bin/libengine.so"
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/engine.dir/link.txt --verbose=$(VERBOSE)
+/home/orangepi/Code/ai_framework/bin/libengine.so: src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o
+/home/orangepi/Code/ai_framework/bin/libengine.so: src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o
+/home/orangepi/Code/ai_framework/bin/libengine.so: src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o
+/home/orangepi/Code/ai_framework/bin/libengine.so: src/engine/CMakeFiles/engine.dir/build.make
+/home/orangepi/Code/ai_framework/bin/libengine.so: /home/orangepi/Code/ai_framework/third_party/rknn/Linux/librknn_api/aarch64/librknnrt.so
+/home/orangepi/Code/ai_framework/bin/libengine.so: /home/orangepi/Code/ai_framework/third_party/rga/libs/Linux/gcc-aarch64/librga.so
+/home/orangepi/Code/ai_framework/bin/libengine.so: src/engine/CMakeFiles/engine.dir/link.txt
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/orangepi/Code/ai_framework/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX shared library /home/orangepi/Code/ai_framework/bin/libengine.so"
+	cd /home/orangepi/Code/ai_framework/build/src/engine && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/engine.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
-src/engine/CMakeFiles/engine.dir/build: /home/orangepi/Code/Openmmlab/bin/libengine.so
+src/engine/CMakeFiles/engine.dir/build: /home/orangepi/Code/ai_framework/bin/libengine.so
 .PHONY : src/engine/CMakeFiles/engine.dir/build
 
 src/engine/CMakeFiles/engine.dir/clean:
-	cd /home/orangepi/Code/Openmmlab/build/src/engine && $(CMAKE_COMMAND) -P CMakeFiles/engine.dir/cmake_clean.cmake
+	cd /home/orangepi/Code/ai_framework/build/src/engine && $(CMAKE_COMMAND) -P CMakeFiles/engine.dir/cmake_clean.cmake
 .PHONY : src/engine/CMakeFiles/engine.dir/clean
 
 src/engine/CMakeFiles/engine.dir/depend:
-	cd /home/orangepi/Code/Openmmlab/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/orangepi/Code/Openmmlab /home/orangepi/Code/Openmmlab/src/engine /home/orangepi/Code/Openmmlab/build /home/orangepi/Code/Openmmlab/build/src/engine /home/orangepi/Code/Openmmlab/build/src/engine/CMakeFiles/engine.dir/DependInfo.cmake "--color=$(COLOR)"
+	cd /home/orangepi/Code/ai_framework/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/orangepi/Code/ai_framework /home/orangepi/Code/ai_framework/src/engine /home/orangepi/Code/ai_framework/build /home/orangepi/Code/ai_framework/build/src/engine /home/orangepi/Code/ai_framework/build/src/engine/CMakeFiles/engine.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : src/engine/CMakeFiles/engine.dir/depend
 

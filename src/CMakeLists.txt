@@ -1,4 +1,4 @@
-project(OpenMMLab)
+project(ai_framework)
 
 add_executable(${PROJECT_NAME} main.cpp)
 

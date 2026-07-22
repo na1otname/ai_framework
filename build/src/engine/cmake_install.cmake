@@ -1,4 +1,4 @@
-# Install script for directory: /home/orangepi/Code/Openmmlab/src/engine
+# Install script for directory: /home/orangepi/Code/ai_framework/src/engine
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

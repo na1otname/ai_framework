@@ -1,0 +1,25 @@
+# Python 相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+
+# IDE 与编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 模型文件与大型二进制文件（如果不想让大模型文件占用 Git 仓库体积）
+model/
+*.rknn
+*.onnx
+*.weights
+
+# 日志与临时文件
+*.log
+build/
+dist/
+model/

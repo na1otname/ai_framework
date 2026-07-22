@@ -1,32 +1,32 @@
 [
 {
-  "directory": "/home/orangepi/Code/Openmmlab/build/test",
-  "command": "/usr/bin/c++  -I/home/orangepi/Code/Openmmlab/src -I/home/orangepi/Code/Openmmlab/third_party/rknn/Linux/librknn_api/include -I/home/orangepi/Code/Openmmlab/third_party/rga/include -I/home/orangepi/Code/Openmmlab/src/engine -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/test_openmmlab.dir/main.cpp.o -c /home/orangepi/Code/Openmmlab/test/main.cpp",
-  "file": "/home/orangepi/Code/Openmmlab/test/main.cpp",
-  "output": "test/CMakeFiles/test_openmmlab.dir/main.cpp.o"
+  "directory": "/home/orangepi/Code/ai_framework/build/test",
+  "command": "/usr/bin/aarch64-linux-gnu-g++  -I/home/orangepi/Code/ai_framework/src -I/home/orangepi/Code/ai_framework/third_party/rknn/Linux/librknn_api/include -I/home/orangepi/Code/ai_framework/third_party/rga/include -I/home/orangepi/Code/ai_framework/src/engine -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/test_ai_framework.dir/main.cpp.o -c /home/orangepi/Code/ai_framework/test/main.cpp",
+  "file": "/home/orangepi/Code/ai_framework/test/main.cpp",
+  "output": "test/CMakeFiles/test_ai_framework.dir/main.cpp.o"
 },
 {
-  "directory": "/home/orangepi/Code/Openmmlab/build/src",
-  "command": "/usr/bin/c++  -I/usr/local/include/opencv4 -I/home/orangepi/Code/Openmmlab/src -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/OpenMMLab.dir/main.cpp.o -c /home/orangepi/Code/Openmmlab/src/main.cpp",
-  "file": "/home/orangepi/Code/Openmmlab/src/main.cpp",
-  "output": "src/CMakeFiles/OpenMMLab.dir/main.cpp.o"
+  "directory": "/home/orangepi/Code/ai_framework/build/src",
+  "command": "/usr/bin/aarch64-linux-gnu-g++  -I/usr/local/include/opencv4 -I/home/orangepi/Code/ai_framework/src -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/ai_framework.dir/main.cpp.o -c /home/orangepi/Code/ai_framework/src/main.cpp",
+  "file": "/home/orangepi/Code/ai_framework/src/main.cpp",
+  "output": "src/CMakeFiles/ai_framework.dir/main.cpp.o"
 },
 {
-  "directory": "/home/orangepi/Code/Openmmlab/build/src/engine",
-  "command": "/usr/bin/c++ -DRK3588=1 -Dengine_EXPORTS -I/usr/local/include/opencv4 -I/home/orangepi/Code/Openmmlab/src -I/home/orangepi/Code/Openmmlab/third_party/rknn/Linux/librknn_api/include -I/home/orangepi/Code/Openmmlab/third_party/rga/include -I/home/orangepi/Code/Openmmlab/src/engine -O3 -DNDEBUG -std=gnu++17 -fPIC -o CMakeFiles/engine.dir/ai_framework.cpp.o -c /home/orangepi/Code/Openmmlab/src/engine/ai_framework.cpp",
-  "file": "/home/orangepi/Code/Openmmlab/src/engine/ai_framework.cpp",
+  "directory": "/home/orangepi/Code/ai_framework/build/src/engine",
+  "command": "/usr/bin/aarch64-linux-gnu-g++ -DRK3588=1 -Dengine_EXPORTS -I/usr/local/include/opencv4 -I/home/orangepi/Code/ai_framework/src -I/home/orangepi/Code/ai_framework/third_party/rknn/Linux/librknn_api/include -I/home/orangepi/Code/ai_framework/third_party/rga/include -I/home/orangepi/Code/ai_framework/src/engine -O3 -DNDEBUG -std=gnu++17 -fPIC -o CMakeFiles/engine.dir/ai_framework.cpp.o -c /home/orangepi/Code/ai_framework/src/engine/ai_framework.cpp",
+  "file": "/home/orangepi/Code/ai_framework/src/engine/ai_framework.cpp",
   "output": "src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o"
 },
 {
-  "directory": "/home/orangepi/Code/Openmmlab/build/src/engine",
-  "command": "/usr/bin/c++ -DRK3588=1 -Dengine_EXPORTS -I/usr/local/include/opencv4 -I/home/orangepi/Code/Openmmlab/src -I/home/orangepi/Code/Openmmlab/third_party/rknn/Linux/librknn_api/include -I/home/orangepi/Code/Openmmlab/third_party/rga/include -I/home/orangepi/Code/Openmmlab/src/engine -O3 -DNDEBUG -std=gnu++17 -fPIC -o CMakeFiles/engine.dir/ai_instance.cpp.o -c /home/orangepi/Code/Openmmlab/src/engine/ai_instance.cpp",
-  "file": "/home/orangepi/Code/Openmmlab/src/engine/ai_instance.cpp",
+  "directory": "/home/orangepi/Code/ai_framework/build/src/engine",
+  "command": "/usr/bin/aarch64-linux-gnu-g++ -DRK3588=1 -Dengine_EXPORTS -I/usr/local/include/opencv4 -I/home/orangepi/Code/ai_framework/src -I/home/orangepi/Code/ai_framework/third_party/rknn/Linux/librknn_api/include -I/home/orangepi/Code/ai_framework/third_party/rga/include -I/home/orangepi/Code/ai_framework/src/engine -O3 -DNDEBUG -std=gnu++17 -fPIC -o CMakeFiles/engine.dir/ai_instance.cpp.o -c /home/orangepi/Code/ai_framework/src/engine/ai_instance.cpp",
+  "file": "/home/orangepi/Code/ai_framework/src/engine/ai_instance.cpp",
   "output": "src/engine/CMakeFiles/engine.dir/ai_instance.cpp.o"
 },
 {
-  "directory": "/home/orangepi/Code/Openmmlab/build/src/engine",
-  "command": "/usr/bin/c++ -DRK3588=1 -Dengine_EXPORTS -I/usr/local/include/opencv4 -I/home/orangepi/Code/Openmmlab/src -I/home/orangepi/Code/Openmmlab/third_party/rknn/Linux/librknn_api/include -I/home/orangepi/Code/Openmmlab/third_party/rga/include -I/home/orangepi/Code/Openmmlab/src/engine -O3 -DNDEBUG -std=gnu++17 -fPIC -o CMakeFiles/engine.dir/backend/rk3588.cpp.o -c /home/orangepi/Code/Openmmlab/src/engine/backend/rk3588.cpp",
-  "file": "/home/orangepi/Code/Openmmlab/src/engine/backend/rk3588.cpp",
+  "directory": "/home/orangepi/Code/ai_framework/build/src/engine",
+  "command": "/usr/bin/aarch64-linux-gnu-g++ -DRK3588=1 -Dengine_EXPORTS -I/usr/local/include/opencv4 -I/home/orangepi/Code/ai_framework/src -I/home/orangepi/Code/ai_framework/third_party/rknn/Linux/librknn_api/include -I/home/orangepi/Code/ai_framework/third_party/rga/include -I/home/orangepi/Code/ai_framework/src/engine -O3 -DNDEBUG -std=gnu++17 -fPIC -o CMakeFiles/engine.dir/backend/rk3588.cpp.o -c /home/orangepi/Code/ai_framework/src/engine/backend/rk3588.cpp",
+  "file": "/home/orangepi/Code/ai_framework/src/engine/backend/rk3588.cpp",
   "output": "src/engine/CMakeFiles/engine.dir/backend/rk3588.cpp.o"
 }
 ]

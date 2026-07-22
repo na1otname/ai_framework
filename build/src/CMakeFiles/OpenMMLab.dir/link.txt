@@ -1,1 +1,1 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/OpenMMLab.dir/main.cpp.o -o OpenMMLab
+/usr/bin/aarch64-linux-gnu-g++ -O3 -DNDEBUG CMakeFiles/OpenMMLab.dir/main.cpp.o -o OpenMMLab

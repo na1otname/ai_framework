@@ -1,7 +1,7 @@
 src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o: \
- /home/orangepi/Code/Openmmlab/src/engine/ai_framework.cpp \
+ /home/orangepi/Code/ai_framework/src/engine/ai_framework.cpp \
  /usr/include/stdc-predef.h \
- /home/orangepi/Code/Openmmlab/src/engine/ai_framework.h \
+ /home/orangepi/Code/ai_framework/src/engine/ai_framework.h \
  /usr/include/c++/11/map /usr/include/c++/11/bits/stl_tree.h \
  /usr/include/c++/11/bits/stl_algobase.h \
  /usr/include/aarch64-linux-gnu/c++/11/bits/c++config.h \
@@ -147,8 +147,8 @@ src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o: \
  /usr/include/aarch64-linux-gnu/bits/types/error_t.h \
  /usr/include/c++/11/bits/charconv.h \
  /usr/include/c++/11/bits/basic_string.tcc \
- /home/orangepi/Code/Openmmlab/third_party/rknn/Linux/librknn_api/include/rknn_api.h \
- /home/orangepi/Code/Openmmlab/src/engine/ai_instance.h \
+ /home/orangepi/Code/ai_framework/third_party/rknn/Linux/librknn_api/include/rknn_api.h \
+ /home/orangepi/Code/ai_framework/src/engine/ai_instance.h \
  /usr/include/c++/11/memory /usr/include/c++/11/bits/stl_tempbuf.h \
  /usr/include/c++/11/bits/stl_raw_storage_iter.h \
  /usr/include/c++/11/bits/align.h /usr/include/c++/11/bit \
@@ -166,7 +166,7 @@ src/engine/CMakeFiles/engine.dir/ai_framework.cpp.o: \
  /usr/include/c++/11/backward/auto_ptr.h \
  /usr/include/c++/11/pstl/glue_memory_defs.h \
  /usr/include/c++/11/pstl/execution_defs.h /usr/include/c++/11/stdexcept \
- /home/orangepi/Code/Openmmlab/src/utils/logger.h \
+ /home/orangepi/Code/ai_framework/src/utils/logger.h \
  /usr/include/fmt/format.h /usr/include/c++/11/cmath /usr/include/math.h \
  /usr/include/aarch64-linux-gnu/bits/math-vector.h \
  /usr/include/aarch64-linux-gnu/bits/libm-simd-decl-stubs.h \

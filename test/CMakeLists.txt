@@ -3,7 +3,7 @@
 # ============================================================
 
 # 测试可执行文件
-add_executable(test_openmmlab
+add_executable(test_ai_framework
     main.cpp
 )
 
@@ -11,14 +11,14 @@ add_executable(test_openmmlab
 
 
 # 添加项目源码根目录（用于 #include "utils/logger.h" 等）
-target_include_directories(test_openmmlab PRIVATE
+target_include_directories(test_ai_framework PRIVATE
     ${RKNN_API_INCLUDE_PATH}
     ${RGA_API_INCLUDE_PATH}
     ${CMAKE_SOURCE_DIR}/src
 )
 
 # 链接被测库
-target_link_libraries(test_openmmlab PRIVATE
+target_link_libraries(test_ai_framework PRIVATE
     engine
     ${RKNN_API_LIB_PATH}
     ${RGA_API_LIB_PATH}

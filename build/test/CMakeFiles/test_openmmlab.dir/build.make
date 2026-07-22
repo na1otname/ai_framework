@@ -53,10 +53,10 @@ RM = /usr/local/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/orangepi/Code/Openmmlab
+CMAKE_SOURCE_DIR = /home/orangepi/Code/ai_framework
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/orangepi/Code/Openmmlab/build
+CMAKE_BINARY_DIR = /home/orangepi/Code/ai_framework/build
 
 # Include any dependencies generated for this target.
 include test/CMakeFiles/test_openmmlab.dir/depend.make
@@ -70,18 +70,18 @@ include test/CMakeFiles/test_openmmlab.dir/progress.make
 include test/CMakeFiles/test_openmmlab.dir/flags.make
 
 test/CMakeFiles/test_openmmlab.dir/main.cpp.o: test/CMakeFiles/test_openmmlab.dir/flags.make
-test/CMakeFiles/test_openmmlab.dir/main.cpp.o: /home/orangepi/Code/Openmmlab/test/main.cpp
+test/CMakeFiles/test_openmmlab.dir/main.cpp.o: /home/orangepi/Code/ai_framework/test/main.cpp
 test/CMakeFiles/test_openmmlab.dir/main.cpp.o: test/CMakeFiles/test_openmmlab.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/orangepi/Code/Openmmlab/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object test/CMakeFiles/test_openmmlab.dir/main.cpp.o"
-	cd /home/orangepi/Code/Openmmlab/build/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT test/CMakeFiles/test_openmmlab.dir/main.cpp.o -MF CMakeFiles/test_openmmlab.dir/main.cpp.o.d -o CMakeFiles/test_openmmlab.dir/main.cpp.o -c /home/orangepi/Code/Openmmlab/test/main.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/orangepi/Code/ai_framework/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object test/CMakeFiles/test_openmmlab.dir/main.cpp.o"
+	cd /home/orangepi/Code/ai_framework/build/test && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT test/CMakeFiles/test_openmmlab.dir/main.cpp.o -MF CMakeFiles/test_openmmlab.dir/main.cpp.o.d -o CMakeFiles/test_openmmlab.dir/main.cpp.o -c /home/orangepi/Code/ai_framework/test/main.cpp
 
 test/CMakeFiles/test_openmmlab.dir/main.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/test_openmmlab.dir/main.cpp.i"
-	cd /home/orangepi/Code/Openmmlab/build/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/orangepi/Code/Openmmlab/test/main.cpp > CMakeFiles/test_openmmlab.dir/main.cpp.i
+	cd /home/orangepi/Code/ai_framework/build/test && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/orangepi/Code/ai_framework/test/main.cpp > CMakeFiles/test_openmmlab.dir/main.cpp.i
 
 test/CMakeFiles/test_openmmlab.dir/main.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/test_openmmlab.dir/main.cpp.s"
-	cd /home/orangepi/Code/Openmmlab/build/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/orangepi/Code/Openmmlab/test/main.cpp -o CMakeFiles/test_openmmlab.dir/main.cpp.s
+	cd /home/orangepi/Code/ai_framework/build/test && /usr/bin/aarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/orangepi/Code/ai_framework/test/main.cpp -o CMakeFiles/test_openmmlab.dir/main.cpp.s
 
 # Object files for target test_openmmlab
 test_openmmlab_OBJECTS = \
@@ -92,22 +92,22 @@ test_openmmlab_EXTERNAL_OBJECTS =
 
 test/test_openmmlab: test/CMakeFiles/test_openmmlab.dir/main.cpp.o
 test/test_openmmlab: test/CMakeFiles/test_openmmlab.dir/build.make
-test/test_openmmlab: /home/orangepi/Code/Openmmlab/bin/libengine.so
-test/test_openmmlab: /home/orangepi/Code/Openmmlab/third_party/rknn/Linux/librknn_api/aarch64/librknnrt.so
-test/test_openmmlab: /home/orangepi/Code/Openmmlab/third_party/rga/libs/Linux/gcc-aarch64/librga.so
+test/test_openmmlab: /home/orangepi/Code/ai_framework/bin/libengine.so
+test/test_openmmlab: /home/orangepi/Code/ai_framework/third_party/rknn/Linux/librknn_api/aarch64/librknnrt.so
+test/test_openmmlab: /home/orangepi/Code/ai_framework/third_party/rga/libs/Linux/gcc-aarch64/librga.so
 test/test_openmmlab: test/CMakeFiles/test_openmmlab.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/orangepi/Code/Openmmlab/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable test_openmmlab"
-	cd /home/orangepi/Code/Openmmlab/build/test && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/test_openmmlab.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/orangepi/Code/ai_framework/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable test_openmmlab"
+	cd /home/orangepi/Code/ai_framework/build/test && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/test_openmmlab.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 test/CMakeFiles/test_openmmlab.dir/build: test/test_openmmlab
 .PHONY : test/CMakeFiles/test_openmmlab.dir/build
 
 test/CMakeFiles/test_openmmlab.dir/clean:
-	cd /home/orangepi/Code/Openmmlab/build/test && $(CMAKE_COMMAND) -P CMakeFiles/test_openmmlab.dir/cmake_clean.cmake
+	cd /home/orangepi/Code/ai_framework/build/test && $(CMAKE_COMMAND) -P CMakeFiles/test_openmmlab.dir/cmake_clean.cmake
 .PHONY : test/CMakeFiles/test_openmmlab.dir/clean
 
 test/CMakeFiles/test_openmmlab.dir/depend:
-	cd /home/orangepi/Code/Openmmlab/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/orangepi/Code/Openmmlab /home/orangepi/Code/Openmmlab/test /home/orangepi/Code/Openmmlab/build /home/orangepi/Code/Openmmlab/build/test /home/orangepi/Code/Openmmlab/build/test/CMakeFiles/test_openmmlab.dir/DependInfo.cmake "--color=$(COLOR)"
+	cd /home/orangepi/Code/ai_framework/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/orangepi/Code/ai_framework /home/orangepi/Code/ai_framework/test /home/orangepi/Code/ai_framework/build /home/orangepi/Code/ai_framework/build/test /home/orangepi/Code/ai_framework/build/test/CMakeFiles/test_openmmlab.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : test/CMakeFiles/test_openmmlab.dir/depend
 

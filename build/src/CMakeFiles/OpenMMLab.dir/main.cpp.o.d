@@ -1,5 +1,5 @@
 src/CMakeFiles/OpenMMLab.dir/main.cpp.o: \
- /home/orangepi/Code/Openmmlab/src/main.cpp /usr/include/stdc-predef.h \
+ /home/orangepi/Code/ai_framework/src/main.cpp /usr/include/stdc-predef.h \
  /usr/include/c++/11/iostream \
  /usr/include/aarch64-linux-gnu/c++/11/bits/c++config.h \
  /usr/include/aarch64-linux-gnu/c++/11/bits/os_defines.h \

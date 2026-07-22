@@ -57,10 +57,10 @@ RM = /usr/local/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/orangepi/Code/Openmmlab
+CMAKE_SOURCE_DIR = /home/orangepi/Code/ai_framework
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/orangepi/Code/Openmmlab/build
+CMAKE_BINARY_DIR = /home/orangepi/Code/ai_framework/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -78,7 +78,7 @@ package/fast: package
 # Special rule for the target package_source
 package_source:
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Run CPack packaging tool for source..."
-	/usr/local/bin/cpack --config ./CPackSourceConfig.cmake /home/orangepi/Code/Openmmlab/build/CPackSourceConfig.cmake
+	/usr/local/bin/cpack --config ./CPackSourceConfig.cmake /home/orangepi/Code/ai_framework/build/CPackSourceConfig.cmake
 .PHONY : package_source
 
 # Special rule for the target package_source
@@ -117,9 +117,9 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/orangepi/Code/Openmmlab/build/CMakeFiles /home/orangepi/Code/Openmmlab/build//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/orangepi/Code/ai_framework/build/CMakeFiles /home/orangepi/Code/ai_framework/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/orangepi/Code/Openmmlab/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/orangepi/Code/ai_framework/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -511,30 +511,30 @@ ContinuousSubmit/fast:
 .PHONY : ContinuousSubmit/fast
 
 #=============================================================================
-# Target rules for targets named test_openmmlab
+# Target rules for targets named test_ai_framework
 
 # Build rule for target.
-test_openmmlab: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_openmmlab
-.PHONY : test_openmmlab
+test_ai_framework: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_ai_framework
+.PHONY : test_ai_framework
 
 # fast build rule for target.
-test_openmmlab/fast:
-	$(MAKE) $(MAKESILENT) -f test/CMakeFiles/test_openmmlab.dir/build.make test/CMakeFiles/test_openmmlab.dir/build
-.PHONY : test_openmmlab/fast
+test_ai_framework/fast:
+	$(MAKE) $(MAKESILENT) -f test/CMakeFiles/test_ai_framework.dir/build.make test/CMakeFiles/test_ai_framework.dir/build
+.PHONY : test_ai_framework/fast
 
 #=============================================================================
-# Target rules for targets named OpenMMLab
+# Target rules for targets named ai_framework
 
 # Build rule for target.
-OpenMMLab: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 OpenMMLab
-.PHONY : OpenMMLab
+ai_framework: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ai_framework
+.PHONY : ai_framework
 
 # fast build rule for target.
-OpenMMLab/fast:
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/OpenMMLab.dir/build.make src/CMakeFiles/OpenMMLab.dir/build
-.PHONY : OpenMMLab/fast
+ai_framework/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/ai_framework.dir/build.make src/CMakeFiles/ai_framework.dir/build
+.PHONY : ai_framework/fast
 
 #=============================================================================
 # Target rules for targets named engine
@@ -588,9 +588,9 @@ help:
 	@echo "... NightlySubmit"
 	@echo "... NightlyTest"
 	@echo "... NightlyUpdate"
-	@echo "... OpenMMLab"
+	@echo "... ai_framework"
 	@echo "... engine"
-	@echo "... test_openmmlab"
+	@echo "... test_ai_framework"
 .PHONY : help
 
 

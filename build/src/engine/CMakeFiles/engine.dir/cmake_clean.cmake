@@ -1,6 +1,6 @@
 file(REMOVE_RECURSE
-  "/home/orangepi/Code/Openmmlab/bin/libengine.pdb"
-  "/home/orangepi/Code/Openmmlab/bin/libengine.so"
+  "/home/orangepi/Code/ai_framework/bin/libengine.pdb"
+  "/home/orangepi/Code/ai_framework/bin/libengine.so"
   "CMakeFiles/engine.dir/ai_framework.cpp.o"
   "CMakeFiles/engine.dir/ai_framework.cpp.o.d"
   "CMakeFiles/engine.dir/ai_instance.cpp.o"
