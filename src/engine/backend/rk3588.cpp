@@ -164,10 +164,13 @@ bool Rk3588::QueryAndConfigureRuntime()
 
     // 4. 分配并查询输入属性
     input_attr_ = (rknn_tensor_attr *)malloc(io_num.n_input * sizeof(rknn_tensor_attr));
+    memset(input_attr_, 0, io_num.n_input * sizeof(rknn_tensor_attr));
     for (uint32_t i = 0; i < io_num.n_input; i++)
     {
         input_attr_[i].index = i;
+
         ret = rknn_query(ctx_, RKNN_QUERY_INPUT_ATTR, &input_attr_[i], sizeof(rknn_tensor_attr));
+
         if (ret != RKNN_SUCC)
         {
             LOG_ERROR("rknn_query input attr {} fail!", i);
@@ -177,10 +180,13 @@ bool Rk3588::QueryAndConfigureRuntime()
 
     // 5. 分配并查询输出属性
     output_attr_ = (rknn_tensor_attr *)malloc(io_num.n_output * sizeof(rknn_tensor_attr));
+    memset(output_attr_, 0, io_num.n_output * sizeof(rknn_tensor_attr));
     for (uint32_t i = 0; i < io_num.n_output; i++)
     {
         output_attr_[i].index = i;
+
         ret = rknn_query(ctx_, RKNN_QUERY_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr));
+
         if (ret != RKNN_SUCC)
         {
             LOG_ERROR("rknn_query output attr {} fail!", i);
@@ -188,11 +194,7 @@ bool Rk3588::QueryAndConfigureRuntime()
         }
     }
 
-    // 6. 为未来的推理申请缓冲区内存
-    input_ = (rknn_input *)malloc(io_num.n_input * sizeof(rknn_input));
-    memset(input_, 0, io_num.n_input * sizeof(rknn_input));
-    output_ = (rknn_output *)malloc(io_num.n_output * sizeof(rknn_output));
-    memset(output_, 0, io_num.n_output * sizeof(rknn_output));
+    // // 6. 为未来的推理申请缓冲区内存
 
     // 7. 配置公共基础 config_
     config_.model_format = ai_framework::RKNN_FORMAT;
@@ -259,49 +261,86 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
         auto **input_mem = tensor_data.get_input_rknn_tensor_mem_ptr();
         auto **output_mem = tensor_data.get_output_rknn_tensor_mem_ptr();
 
+        rknn_tensor_attr input_nativate_attrs[config_.input_tensors_count];
+        memset(input_nativate_attrs, 0, sizeof(input_nativate_attrs));
+
         for (uint32_t i = 0; i < tensor_data.get_input_tensor_count(); ++i)
         {
+            input_nativate_attrs[i].index = i;
+            int ret = rknn_query(ctx_, RKNN_QUERY_NATIVE_INPUT_ATTR, &(input_nativate_attrs[i]), sizeof(rknn_tensor_attr));
+
             // 分配零拷贝输入内存
-            input_mem[i] = rknn_create_mem(ctx_, input_attr_[i].size_with_stride);
+            input_mem[i] = rknn_create_mem(ctx_, input_nativate_attrs[i].size_with_stride);
             if (input_mem[i] == nullptr)
             {
-                LOG_ERROR("rknn_create_mem(input[{}], size={}) failed!", i, input_attr_[i].size_with_stride);
+                LOG_ERROR("rknn_create_mem(input[{}], size={}) failed!", i, input_nativate_attrs[i].size_with_stride);
                 continue;
             }
-            int ret = rknn_set_io_mem(ctx_, input_mem[i], &input_attr_[i]);
+
+            ret = rknn_set_io_mem(ctx_, input_mem[i], &input_nativate_attrs[i]);
+
             if (ret < 0)
             {
                 LOG_ERROR("rknn_set_io_mem(input[{}]) fail! ret={}", i, ret);
                 continue;
             }
+
             LOG_INFO("zero-copy input mem[{}]: virt={} fd={} size={} fmt={}",
                      i,
                      input_mem[i]->virt_addr,
                      input_mem[i]->fd,
-                     input_attr_[i].size_with_stride,
-                     input_attr_[i].fmt);
+                     input_nativate_attrs[i].size_with_stride,
+                     input_nativate_attrs[i].fmt);
         }
+
+        rknn_tensor_attr output_nativate_attrs[config_.output_tensors_count];
+        memset(output_nativate_attrs, 0, sizeof(output_nativate_attrs));
 
         for (uint32_t i = 0; i < tensor_data.get_output_tensor_count(); ++i)
         {
+            output_nativate_attrs[i].index = i;
+            int ret = rknn_query(ctx_, RKNN_QUERY_NATIVE_OUTPUT_ATTR, &(output_nativate_attrs[i]), sizeof(rknn_tensor_attr));
+
             // 分配零拷贝输出内存
-            output_mem[i] = rknn_create_mem(ctx_, output_attr_[i].size_with_stride);
+            output_mem[i] = rknn_create_mem(ctx_, output_nativate_attrs[i].size_with_stride);
             if (output_mem[i] == nullptr)
             {
-                LOG_ERROR("rknn_create_mem(output[{}], size={}) failed!", i, output_attr_[i].size_with_stride);
+                LOG_ERROR("rknn_create_mem(output[{}], size={}) failed!", i, output_nativate_attrs[i].size_with_stride);
                 continue;
             }
-            int ret = rknn_set_io_mem(ctx_, output_mem[i], &output_attr_[i]);
+            ret = rknn_set_io_mem(ctx_, output_mem[i], &output_nativate_attrs[i]);
             if (ret < 0)
             {
                 LOG_ERROR("rknn_set_io_mem(output[{}]) fail! ret={}", i, ret);
                 continue;
             }
-            LOG_INFO("zero-copy output mem[{}]: virt={} fd={} size={}",
+            LOG_INFO("zero-copy output mem[{}]: virt={} fd={} size={} fmt={}",
                      i,
                      output_mem[i]->virt_addr,
                      output_mem[i]->fd,
-                     output_attr_[i].size_with_stride);
+                     output_nativate_attrs[i].size_with_stride,
+                     output_nativate_attrs[i].fmt);
+        }
+    }
+    else
+    {
+        input_ = (rknn_input *)malloc(config_.input_tensors_count * sizeof(rknn_input));
+        memset(input_, 0, config_.input_tensors_count * sizeof(rknn_input));
+        output_ = (rknn_output *)malloc(config_.output_tensors_count * sizeof(rknn_output));
+        memset(output_, 0, config_.output_tensors_count * sizeof(rknn_output));
+
+        for (size_t i = 0; config_.input_tensors_count; ++i)
+        {
+            input_[i].index = i;
+            input_[i].type = input_attr_[i].type;
+            input_[i].fmt = input_attr_[i].fmt;
+            input_[i].size = input_attr_[i].size;
+            input_[i].buf = tensor_data.get_input_tensor_ptr();
+        }
+
+        for (size_t i = 0; config_.output_tensors_count; ++i)
+        {
+            output_[i].index = i;
         }
     }
 }
