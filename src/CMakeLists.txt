@@ -3,4 +3,4 @@ project(ai_framework)
 add_executable(${PROJECT_NAME} main.cpp)
 
 add_subdirectory(engine)
-# add_subdirectory(rtmdet)
+add_subdirectory(image_process)

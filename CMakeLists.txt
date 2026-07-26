@@ -8,13 +8,13 @@ message(STATUS "System: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-    message(STATUS "Not RK3588")
-    # 检查架构
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "i386")
-        set(IS_X86_ARCH TRUE)
-    else()
-        set(IS_X86_ARCH FALSE)
-    endif()
+message(STATUS "Not RK3588")
+# 检查架构
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "i386")
+    set(IS_X86_ARCH TRUE)
+else()
+    set(IS_X86_ARCH FALSE)
+endif()
 
 
 # find_package(ai_instance_tensorrt QUIET)

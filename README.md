@@ -1,1 +1,1 @@
-# ai_frameworke
+# ai_framework
