@@ -170,6 +170,10 @@ namespace ai_framework
 
             // 格式化输出所有属性
             // 注意：fmt, type, qnt_type 在 Config 中暂无对应字段，当前使用 "N/A" 占位
+            auto input_scale_it = config_.scale.find(name);
+            auto input_zp_it = config_.zero_point.find(name);
+            std::string input_zp_str = (input_zp_it != config_.zero_point.end()) ? std::to_string(input_zp_it->second) : "N/A";
+            std::string input_scale_str = (input_scale_it != config_.scale.end()) ? std::to_string(input_scale_it->second) : "N/A";
             LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
                      i,
                      name.c_str(),
@@ -178,8 +182,8 @@ namespace ai_framework
                      config_.input_element_count[name],
                      config_.tensor_size[name],
                      config_.input_fmt_str[name], config_.input_type_str[name], config_.input_qnt_type_str[name], // 如果未来 Config 加了这三个字段，请替换此处
-                     config_.zero_point[name],
-                     config_.scale[name]);
+                     input_zp_str,
+                     input_scale_str);
         }
 
         for (uint16_t i = 0; i < config_.output_tensors_count; i++)
@@ -195,6 +199,10 @@ namespace ai_framework
 
             // 格式化输出所有属性
             // 注意：fmt, type, qnt_type 在 Config 中暂无对应字段，当前使用 "N/A" 占位
+            auto output_scale_it = config_.scale.find(name);
+            auto output_zp_it = config_.zero_point.find(name);
+            std::string output_zp_str = (output_zp_it != config_.zero_point.end()) ? std::to_string(output_zp_it->second) : "N/A";
+            std::string output_scale_str = (output_scale_it != config_.scale.end()) ? std::to_string(output_scale_it->second) : "N/A";
             LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
                      i,
                      name.c_str(),
@@ -203,8 +211,8 @@ namespace ai_framework
                      config_.output_element_count[name],
                      config_.tensor_size[name],
                      config_.output_fmt_str[name], config_.output_type_str[name], config_.output_qnt_type_str[name],
-                     config_.zero_point[name],
-                     config_.scale[name]);
+                     output_zp_str,
+                     output_scale_str);
         }
 
         LOG_INFO("==============================");

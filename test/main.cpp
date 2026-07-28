@@ -14,7 +14,7 @@ int main()
 {
     // === 1. 加载模型（Rk3588 → TensorData → BindInputAndOutput） ===
     const char *model_path =
-        "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320-fp16.rknn";
+        "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320_static_int8.rknn";
     printf("[1/6] Loading model: %s\n", model_path);
     auto engine = ai_framework::Engine(ai_framework::RKNN_FORMAT, model_path);
 
