@@ -1,90 +1,99 @@
 #pragma once
+#include "ai_instance.h"
+#include "opencv2/opencv.hpp"
+#include "stdint.h"
 
-#include <cstdint>
-#include <vector>
-#include <array>
+using ai_framework::ModelFormat;
 
-/**
- * @brief 单个检测结果: [x1, y1, x2, y2, score, class_id]
- */
-struct Detection
-{
-    float x1, y1, x2, y2;
-    float score;
-    int class_id;
-};
-
-/**
- * @brief RTMDet / YOLO 通用后处理参数
- *
- * 默认值对应 RTMDet-nano 在 640×640 输入、stride [8,16,32] 的常见配置。
- */
-struct RtmdetPostParams
-{
-    int input_width = 320;  // 模型输入宽 (rtmdet_nano_320x320)
-    int input_height = 320; // 模型输入高
-    int num_classes = 1;    // 类别数 (cls_score 的通道数)
-    float score_thr = 0.3f; // 分数阈值
-    float nms_iou = 0.5f;   // NMS IoU 阈值
-    int max_per_img = 100;  // 每张图最多保留的检测框数
-
-    // 三层特征图对应的 stride，顺序与输出一致: [P3, P4, P5]
-    std::vector<int> strides = {8, 16, 32};
-};
-
-/**
- * @brief RTMDet 后处理器
- *
- 输入: 模型原始输出 —— 6 个 tensor (const float*)：
- *       cls_P3, cls_P4, cls_P5,  box_P3, box_P4, box_P5
- * 输出: 检测框列表 Detection (坐标在原图坐标系下)
- *
- * 处理流程:
- *   1. 对每层生成 anchor 中心点 (prior)
- *   2. 拉平 cls_score → sigmoid
- *   3. 用 prior 中心点 ± ltrb 解码出 xyxy
- *   4. 按 score_thr 过滤 → NMS → TopK
- */
-class RtmdetPostProcess
+class PostProcess
 {
 public:
-    RtmdetPostProcess() = default;
-    explicit RtmdetPostProcess(const RtmdetPostParams &params);
-
-    /**
-     * @brief 执行后处理
-     * @param outputs 6 个 float*，顺序: [cls1, cls2, cls3, box1, box2, box3]
-     * @param cls_dims 每个 cls tensor 的维度 {N, C, H, W}，共 3 组
-     * @param box_dims 每个 box tensor 的维度 {N, C, H, W}，共 3 组 (C=4)
-     * @return 检测结果列表
-     */
-    std::vector<Detection> Run(
-        const std::vector<const float *> &outputs,
-        const std::vector<std::array<int, 4>> &cls_dims,
-        const std::vector<std::array<int, 4>> &box_dims);
-
-    const RtmdetPostParams &params() const { return params_; }
+    enum ModelType : uint16_t
+    {
+        DETECTION_V8 = 0,
+        DETECTION_V10,
+        DETECTION_V11,
+        DETECTION_V13,
+        POSE_V8,
+        SEGMENT_V11,
+        DETECTION_V26,
+        DETECTION_RTMDE
+    };
+    struct Bbox
+    {
+        float x1;
+        float y1;
+        float x2;
+        float y2;
+    };
+    struct KeyPoint
+    {
+        float x;
+        float y;
+        float visibility;
+    };
+    struct Result
+    {
+        ModelType model_type;
+        Bbox box;
+        float obj_prob;
+        int class_id;
+        cv::Mat seg_mat;
+        KeyPoint key_points[17];
+    };
+    typedef struct
+    {
+        int index;
+        int sub_index;
+        int grid_len;
+    } BboxesIdx;
+    PostProcess() = delete;
+    PostProcess(const ai_framework::Config &config,
+                std::vector<float> &conf_threshold, float sum_conf_threshold,
+                float iou_threshold = 0.5f);
+    void Run(void **&tensors);
+    const std::vector<Result> &get_result() const { return result_; }
 
 private:
-    RtmdetPostParams params_;
+    void PostProcessDetectSegment(void **&tensors);
+    void PostProcessRtmdet(void **&tensors);
+    void ProcessSegment(const void *mask_tensor, const void *proto_tensor,
+                        Result &result, BboxesIdx bboxes_idx,
+                        int output_per_branch);
+    void PostProcessPose(void **&tensors);
+    uint16_t ProcessDetect(const void *box_tensor, const void *score_tensor,
+                           const void *sum_score_tensor, int grid_w, int grid_h,
+                           int stride, int index, int output_per_branch);
 
-    // 内部辅助结构
-    struct Box
-    {
-        float x1, y1, x2, y2;
-    };
+    uint16_t ProcessRtmdet(const void *box_tensor, const void *score_tensor,
+                           const void *sum_score_tensor, int grid_w, int grid_h,
+                           int stride, int index, int output_per_branch);
 
-    /// 为某一层生成 prior 中心点 (映射到原图坐标)
-    std::vector<std::pair<float, float>> GeneratePriors(int stride, int h, int w);
-
-    /// sigmoid
-    static float Sigmoid(float x);
-
-    /// 计算两个框的 IoU
-    static float ComputeIoU(const Box &a, const Box &b);
-
-    /// NMS (贪心)
-    std::vector<int> Nms(const std::vector<Box> &boxes,
-                         const std::vector<float> &scores,
-                         float iou_thr);
+    uint16_t ProcessPose(const void *box_tensor, const void *score_tensor,
+                         const void *kpt_tensor, const void *visibility_tensor,
+                         int grid_w, int grid_h, int stride, int index,
+                         int output_per_branch);
+    uint16_t num_of_layers_;
+    std::vector<std::string> output_layer_names_;
+    std::vector<size_t> output_element_count_;
+    std::vector<std::vector<int64_t>> output_layer_shape;
+    std::vector<float> zero_points_;
+    std::vector<float> scale_;
+    std::vector<float> *conf_threshold_;
+    float sum_conf_threshold_;
+    int model_width_{0};
+    int model_height_{0};
+    int seg_width_{0};
+    int seg_height_{0};
+    int dfl_len_{0};
+    std::vector<Bbox> bboxes_;
+    std::vector<BboxesIdx> bboxes_idx_;
+    std::vector<int> class_id_;
+    std::vector<float> obj_probs_;
+    std::vector<float> kpt;
+    std::vector<float> visibilities;
+    std::vector<Result> result_;
+    ModelType model_type_;
+    ModelFormat model_format_;
+    float iou_threshold_;
 };

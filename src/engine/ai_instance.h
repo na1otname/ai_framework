@@ -21,6 +21,7 @@ namespace ai_framework
         ONNX_FORMAT = 0,
         TRT_FORMAT,
         RKNN_FORMAT,
+        NNRT_FORMAT,
         UNKNOWN_FORMAT,
     };
     struct Config
@@ -80,6 +81,7 @@ namespace ai_framework
         const std::map<std::string, float> &get_tensor_scale() const;
         const std::map<std::string, int> &get_tensor_zero_point() const;
         const ModelFormat get_model_format() const;
+        const Config &get_config() const;
 #ifdef RK3588
         const std::map<std::string, bool> &get_width_equal_stride() const;
         const std::map<std::string, uint32_t> &get_stride() const;

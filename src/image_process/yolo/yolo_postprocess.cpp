@@ -1,229 +1,1070 @@
 #include "yolo_postprocess.h"
 
-#include <algorithm>
 #include <cmath>
-#include <numeric>
-#include <unordered_set>
+#include <cstring>
+#include <set>
 
+#include "iostream"
 #include "utils/logger.h"
 
-// ==================== 构造 ====================
-
-RtmdetPostProcess::RtmdetPostProcess(const RtmdetPostParams &params)
-    : params_(params) {}
-
-// ==================== 公开接口 Run ====================
-
-std::vector<Detection> RtmdetPostProcess::Run(
-    const std::vector<const float *> &outputs,
-    const std::vector<std::array<int, 4>> &cls_dims,
-    const std::vector<std::array<int, 4>> &box_dims)
+static bool ContainsSubString(const std::string &str,
+                              const std::string &substring)
 {
-    const int num_levels = 3;
+    return str.find(substring) != std::string::npos;
+}
 
-    // --- 1. 为每一层生成 prior 中心点 (已映射到原图) ---
-    std::vector<std::vector<std::pair<float, float>>> mlvl_priors(num_levels);
-    for (int i = 0; i < num_levels; ++i)
+inline static int32_t __clip(float val, float min, float max)
+{
+    float f = val <= min ? min : (val >= max ? max : val);
+    return f;
+}
+
+static int8_t qnt_f32_to_affine(float f32, int32_t zp, float scale)
+{
+    float dst_val = (f32 / scale) + zp;
+    int8_t res = (int8_t)__clip(dst_val, -128, 127);
+    return res;
+}
+
+static float deqnt_affine_to_f32(int8_t qnt, int32_t zp, float scale)
+{
+    return ((float)qnt - (float)zp) * scale;
+}
+
+// IEEE 754 half-precision (float16) → float32 转换
+static float fp16_to_f32(uint16_t half)
+{
+    // 提取符号、指数、尾数
+    uint32_t sign = (half & 0x8000u) << 16;
+    uint32_t exp = (half >> 10) & 0x1fu;
+    uint32_t mant = half & 0x3ffu;
+
+    uint32_t f32;
+    if (exp == 0)
     {
-        int h = cls_dims[i][2]; // H
-        int w = cls_dims[i][3]; // W
-        mlvl_priors[i] = GeneratePriors(params_.strides[i], h, w);
+        // 零 / 次正规数
+        if (mant == 0)
+        {
+            f32 = sign; // +/-0
+        }
+        else
+        {
+            // 次正规数 → 正规化
+            while ((mant & 0x400u) == 0)
+            {
+                mant <<= 1;
+                exp--;
+            }
+            mant &= 0x3ffu;
+            exp = 1 + (127 - 15);
+            f32 = sign | (exp << 23) | (mant << 13);
+        }
+    }
+    else if (exp == 0x1f)
+    {
+        // Inf / NaN
+        f32 = sign | (0xffu << 23) | (mant << 13);
+    }
+    else
+    {
+        // 正规数
+        exp = exp + (127 - 15);
+        f32 = sign | (exp << 23) | (mant << 13);
     }
 
-    // --- 2. 拉平 cls_score 和 bbox_pred，同时做 sigmoid ---
-    // 先算总 anchor 数
-    int total_anchors = 0;
-    for (int i = 0; i < num_levels; ++i)
-        total_anchors += cls_dims[i][2] * cls_dims[i][3];
+    float result;
+    memcpy(&result, &f32, sizeof(float));
+    return result;
+}
 
-    // 临时存储: 展开后的所有候选框及其分数
-    // 为了性能，先做 score 过滤再进 NMS (而不是全存)
-    std::vector<Box> candidate_boxes;
-    std::vector<float> candidate_scores;
-    std::vector<int> candidate_labels;
-    candidate_boxes.reserve(total_anchors);
-    candidate_scores.reserve(total_anchors);
-    candidate_labels.reserve(total_anchors);
-
-    for (int lvl = 0; lvl < num_levels; ++lvl)
+PostProcess::PostProcess(const ai_framework::Config &config,
+                         std::vector<float> &conf_threshold,
+                         float sum_conf_threshold,
+                         float iou_threshold)
+{
+    model_format_ = config.model_format;
+    iou_threshold_ = iou_threshold;
+    num_of_layers_ = config.output_tensors_count;
+    for (size_t i = 0; i < num_of_layers_; ++i)
     {
-        const float *cls_ptr = outputs[lvl];              // [1, C, H, W]
-        const float *box_ptr = outputs[num_levels + lvl]; // [1, 4, H, W]
-
-        int C = cls_dims[lvl][1]; // 类别数 (为 1 时是单类)
-        int H = cls_dims[lvl][2];
-        int W = cls_dims[lvl][3];
-
-        int num_anchors = H * W;
-        const auto &priors = mlvl_priors[lvl];
-
-        for (int a = 0; a < num_anchors; ++a)
+        auto layer = config.output_index_to_name.at(i);
+        LOG_INFO("Post Index = {}, layer name = {}", i, layer);
+        output_layer_names_.push_back(layer);
+        output_layer_shape.push_back(config.output_layer_shape.at(layer));
+        output_element_count_.push_back(config.output_element_count.at(layer));
+        if (config.zero_point.find(layer) != config.zero_point.end())
         {
-            // --- 处理 cls_score: [C, H, W] NCHW 排列 ---
-            // 对每个类别独立处理：找出最大分数及对应类别
-            float max_score = 0.0f;
-            int best_cls = 0;
-            for (int c = 0; c < C; ++c)
+            zero_points_.push_back(config.zero_point.at(layer));
+        }
+        if (config.scale.find(layer) != config.scale.end())
+        {
+            scale_.push_back(config.scale.at(layer));
+        }
+    }
+    conf_threshold_ = &conf_threshold;
+    sum_conf_threshold_ = sum_conf_threshold;
+    auto input_shape =
+        config.input_layer_shape.at(config.input_index_to_name.at(0));
+    model_width_ = input_shape.at(3);
+    model_height_ = input_shape.at(2);
+    auto output_boxes_shape =
+        config.output_layer_shape.at(config.output_index_to_name.at(0));
+    dfl_len_ = output_boxes_shape.at(1) / 4;
+    auto output_boxes_name = config.output_index_to_name.at(0);
+    if (ContainsSubString(output_boxes_name, "yolo26_detect"))
+    {
+        model_type_ = ModelType::DETECTION_V26;
+    }
+    else if (ContainsSubString(output_boxes_name, "yolov10"))
+    {
+        model_type_ = ModelType::DETECTION_V10;
+    }
+    else if (ContainsSubString(output_boxes_name, "yolov8_detect"))
+    {
+        model_type_ = ModelType::DETECTION_V8;
+    }
+    else if (ContainsSubString(output_boxes_name, "yolov8_pose") ||
+             ContainsSubString(output_boxes_name, "yolo11_pose"))
+    {
+        model_type_ = ModelType::POSE_V8;
+    }
+    else if (ContainsSubString(output_boxes_name, "yolo13_detect"))
+    {
+        model_type_ = ModelType::DETECTION_V13;
+    }
+    else if (ContainsSubString(output_boxes_name, "yolo11_detect"))
+    {
+        model_type_ = ModelType::DETECTION_V11;
+    }
+    else if (ContainsSubString(output_boxes_name, "rtmdet") ||
+             ContainsSubString(output_boxes_name, "rtmde") ||
+             ContainsSubString(output_boxes_name, "rtm_"))
+    {
+        model_type_ = ModelType::DETECTION_RTMDE;
+    }
+    else if (ContainsSubString(output_boxes_name, "yolo11_segment"))
+    {
+        model_type_ = ModelType::SEGMENT_V11;
+        auto tmp = config.output_layer_shape.rbegin();
+        seg_width_ = tmp->second.at(3);
+        seg_height_ = tmp->second.at(2);
+        LOG_INFO("yolo11_segment resolution: {}x{}", seg_width_,
+                 seg_height_);
+    }
+    LOG_INFO("ModelType: {}", model_type_);
+}
+
+void PostProcess::Run(void **&tensors)
+{
+    result_.clear();
+    bboxes_.clear();
+    class_id_.clear();
+    obj_probs_.clear();
+    bboxes_idx_.clear();
+    if (model_type_ == ModelType::DETECTION_V8 ||
+        model_type_ == ModelType::DETECTION_V26 ||
+        model_type_ == ModelType::DETECTION_V10 ||
+        model_type_ == ModelType::DETECTION_V11 ||
+        model_type_ == ModelType::DETECTION_V13 ||
+        model_type_ == ModelType::SEGMENT_V11)
+    {
+        PostProcessDetectSegment(tensors);
+    }
+    else if (model_type_ == ModelType::DETECTION_RTMDE)
+    {
+        PostProcessRtmdet(tensors);
+    }
+    else if (model_type_ == ModelType::POSE_V8)
+    {
+        kpt.clear();
+        visibilities.clear();
+        PostProcessPose(tensors);
+    }
+}
+
+static int quick_sort_indice_inverse(std::vector<float> &input, int left,
+                                     int right, std::vector<int> &indices)
+{
+    float key;
+    int key_index;
+    int low = left;
+    int high = right;
+    if (left < right)
+    {
+        key_index = indices[left];
+        key = input[left];
+        while (low < high)
+        {
+            while (low < high && input[high] <= key)
             {
-                // NCHW: index = c * H * W + a
-                float raw = cls_ptr[c * H * W + a];
-                float prob = Sigmoid(raw);
-                if (prob > max_score)
+                high--;
+            }
+            input[low] = input[high];
+            indices[low] = indices[high];
+            while (low < high && input[low] >= key)
+            {
+                low++;
+            }
+            input[high] = input[low];
+            indices[high] = indices[low];
+        }
+        input[low] = key;
+        indices[low] = key_index;
+        quick_sort_indice_inverse(input, left, low - 1, indices);
+        quick_sort_indice_inverse(input, low + 1, right, indices);
+    }
+    return low;
+}
+
+static float CalculateOverlap(float xmin0, float ymin0, float xmax0,
+                              float ymax0, float xmin1, float ymin1,
+                              float xmax1, float ymax1)
+{
+    float w = fmax(0.f, fmin(xmax0, xmax1) - fmax(xmin0, xmin1) + 1.0);
+    float h = fmax(0.f, fmin(ymax0, ymax1) - fmax(ymin0, ymin1) + 1.0);
+    float i = w * h;
+    float u = (xmax0 - xmin0 + 1.0) * (ymax0 - ymin0 + 1.0) +
+              (xmax1 - xmin1 + 1.0) * (ymax1 - ymin1 + 1.0) - i;
+    return u <= 0.f ? 0.f : (i / u);
+}
+
+static int nms(int validCount, std::vector<PostProcess::Bbox> &bboxes,
+               std::vector<int> &order, float threshold)
+{
+    for (int i = 0; i < validCount; ++i)
+    {
+        if (order[i] == -1)
+        {
+            continue;
+        }
+        int n = order[i];
+        for (int j = i + 1; j < validCount; ++j)
+        {
+            int m = order[j];
+            if (m == -1)
+            {
+                continue;
+            }
+            float xmin0 = bboxes.at(n).x1;
+            float ymin0 = bboxes.at(n).y1;
+            float xmax0 = bboxes.at(n).x2;
+            float ymax0 = bboxes.at(n).y2;
+            float xmin1 = bboxes.at(m).x1;
+            float ymin1 = bboxes.at(m).y1;
+            float xmax1 = bboxes.at(m).x2;
+            float ymax1 = bboxes.at(m).y2;
+            float iou = CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1,
+                                         xmax1, ymax1);
+            if (iou > threshold)
+            {
+                order[j] = -1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int nms(const int validCount,
+               const std::vector<PostProcess::Bbox> &bboxes,
+               const std::vector<int> classIds, std::vector<int> &order,
+               const int filterId, const float threshold)
+{
+    for (int i = 0; i < validCount; ++i)
+    {
+        if (order[i] == -1 || classIds[order[i]] != filterId)
+        {
+            continue;
+        }
+        int n = order[i];
+        for (int j = i + 1; j < validCount; ++j)
+        {
+            int m = order[j];
+            if (m == -1 || classIds[order[j]] != filterId)
+            {
+                continue;
+            }
+            float xmin0 = bboxes.at(n).x1;
+            float ymin0 = bboxes.at(n).y1;
+            float xmax0 = bboxes.at(n).x2;
+            float ymax0 = bboxes.at(n).y2;
+            float xmin1 = bboxes.at(m).x1;
+            float ymin1 = bboxes.at(m).y1;
+            float xmax1 = bboxes.at(m).x2;
+            float ymax1 = bboxes.at(m).y2;
+            float iou = CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1,
+                                         xmax1, ymax1);
+            if (iou > threshold)
+            {
+                order[j] = -1;
+            }
+        }
+    }
+    return 0;
+}
+
+void PostProcess::PostProcessPose(void **&tensors)
+{
+    int validCount = 0;
+    int stride = 0;
+    int grid_h = 0;
+    int grid_w = 0;
+    int output_per_branch = num_of_layers_ / 3;
+    for (int i = 0; i < 3; ++i)
+    {
+        int box_idx = i * output_per_branch;
+        int score_idx = i * output_per_branch + 1;
+        int kpt_idx = i * output_per_branch + 2;
+        int visibilities_idx = i * output_per_branch + 3;
+        grid_h = output_layer_shape.at(box_idx).at(2);
+        grid_w = output_layer_shape.at(box_idx).at(3);
+        stride = model_height_ / grid_h;
+        validCount +=
+            ProcessPose(reinterpret_cast<const void *>(tensors[box_idx]),
+                        reinterpret_cast<const void *>(tensors[score_idx]),
+                        reinterpret_cast<const void *>(tensors[kpt_idx]),
+                        reinterpret_cast<const void *>(tensors[visibilities_idx]),
+                        grid_w, grid_h, stride, i, output_per_branch);
+    }
+    if (validCount <= 0)
+    {
+        return;
+    }
+    std::vector<int> indexArray;
+    for (int i = 0; i < validCount; i++)
+    {
+        indexArray.push_back(i);
+    }
+    quick_sort_indice_inverse(obj_probs_, 0, validCount - 1, indexArray);
+    nms(validCount, bboxes_, indexArray, iou_threshold_);
+    for (int i = 0; i < validCount; ++i)
+    {
+        if (indexArray[i] == -1)
+        {
+            continue;
+        }
+        int n = indexArray[i];
+        Result res;
+        res.model_type = ModelType::POSE_V8;
+        res.box = bboxes_.at(n);
+        res.class_id = class_id_.at(n);
+        res.obj_prob = obj_probs_.at(n);
+        for (int j = 0; j < 34; j += 2)
+        {
+            auto kpt_x = kpt.at(34 * n + j);
+            auto kpt_y = kpt.at(34 * n + j + 1);
+            auto visibility = visibilities.at(17 * n + j / 2);
+            res.key_points[j / 2].x = kpt_x;
+            res.key_points[j / 2].y = kpt_y;
+            res.key_points[j / 2].visibility = visibility;
+        }
+        result_.push_back(res);
+    }
+}
+
+void PostProcess::PostProcessDetectSegment(void **&tensors)
+{
+    int validCount = 0;
+    int stride = 0;
+    int grid_h = 0;
+    int grid_w = 0;
+    int output_per_branch = num_of_layers_ / 3;
+    for (int i = 0; i < 3; ++i)
+    {
+        int box_index = i * output_per_branch;
+        int score_index = i * output_per_branch + 1;
+        int sum_score_index = i * output_per_branch + 2;
+        grid_h = output_layer_shape.at(box_index).at(2);
+        grid_w = output_layer_shape.at(box_index).at(3);
+        stride = model_height_ / grid_h;
+        validCount += ProcessDetect(tensors[box_index], tensors[score_index],
+                                    tensors[sum_score_index], grid_w, grid_h,
+                                    stride, i, output_per_branch);
+    }
+    //    std::cout << "validCount: " << validCount << std::endl;
+    //  LOG_DEBUG("validCount: {}", validCount);
+    if (validCount <= 0)
+    {
+        return;
+    }
+    std::vector<int> indexArray;
+    if (model_type_ == ModelType::DETECTION_V8 ||
+        model_type_ == ModelType::DETECTION_V11 ||
+        model_type_ == ModelType::DETECTION_V13 ||
+        model_type_ == ModelType::SEGMENT_V11)
+    {
+        for (int i = 0; i < validCount; i++)
+        {
+            indexArray.push_back(i);
+        }
+        quick_sort_indice_inverse(obj_probs_, 0, validCount - 1, indexArray);
+        std::set<int> class_set(std::begin(class_id_), std::end(class_id_));
+        for (auto c : class_set)
+        {
+            nms(validCount, bboxes_, class_id_, indexArray, c, iou_threshold_);
+        }
+    }
+    for (int i = 0; i < validCount; ++i)
+    {
+        int n = i;
+        Result res;
+        if (model_type_ == ModelType::DETECTION_V8 ||
+            model_type_ == ModelType::DETECTION_V11 ||
+            model_type_ == ModelType::DETECTION_V13 ||
+            model_type_ == ModelType::SEGMENT_V11)
+        {
+            if (indexArray[i] == -1)
+            {
+                continue;
+            }
+            n = indexArray[i];
+            res.model_type = model_type_;
+        }
+        else if (model_type_ == ModelType::DETECTION_V10 ||
+                 model_type_ == ModelType::DETECTION_V26)
+        {
+            n = i;
+            res.model_type = model_type_;
+        }
+        res.box = bboxes_.at(n);
+        res.class_id = class_id_.at(n);
+        // 上面快排的时候，元素有交换
+        res.obj_prob = obj_probs_.at(i);
+        if (model_type_ == ModelType::SEGMENT_V11)
+        {
+            int mask_index = bboxes_idx_.at(n).index * output_per_branch + 3;
+            int proto_index = num_of_layers_ - 1;
+            ProcessSegment(tensors[mask_index], tensors[proto_index], res,
+                           bboxes_idx_.at(n), output_per_branch);
+        }
+        result_.push_back(res);
+    }
+}
+
+
+void PostProcess::PostProcessRtmdet(void **&tensors)
+{
+    int validCount = 0;
+    int stride = 0;
+    int grid_h = 0;
+    int grid_w = 0;
+    // RTMDet: first half outputs are cls scores, second half are bbox predictions
+    int cls_layers = num_of_layers_ / 2;
+
+    for (int i = 0; i < cls_layers; ++i)
+    {
+        int score_index = i;            // cls tensor
+        int box_index = i + cls_layers; // bbox tensor
+        grid_h = output_layer_shape.at(box_index).at(2);
+        grid_w = output_layer_shape.at(box_index).at(3);
+        stride = model_height_ / grid_h;
+        validCount += ProcessRtmdet(tensors[box_index], tensors[score_index],
+                                    nullptr, grid_w, grid_h, stride, i,
+                                    cls_layers);
+    }
+
+    if (validCount <= 0)
+    {
+        return;
+    }
+
+    // Sort by confidence
+    std::vector<int> indexArray;
+    for (int i = 0; i < validCount; i++)
+    {
+        indexArray.push_back(i);
+    }
+    quick_sort_indice_inverse(obj_probs_, 0, validCount - 1, indexArray);
+
+    // Per-class NMS
+    std::set<int> class_set(std::begin(class_id_), std::end(class_id_));
+    for (auto c : class_set)
+    {
+        nms(validCount, bboxes_, class_id_, indexArray, c, iou_threshold_);
+    }
+
+    for (int i = 0; i < validCount; ++i)
+    {
+        if (indexArray[i] == -1)
+        {
+            continue;
+        }
+        int n = indexArray[i];
+        Result res;
+        res.model_type = ModelType::DETECTION_RTMDE;
+        res.box = bboxes_.at(n);
+        res.class_id = class_id_.at(n);
+        res.obj_prob = obj_probs_.at(i);
+        result_.push_back(res);
+    }
+}
+
+void PostProcess::ProcessSegment(const void *mask_tensor,
+                                 const void *proto_tensor, Result &result,
+                                 BboxesIdx bboxes_idx,
+                                 int output_per_branch)
+{
+    const float *mask_tensor_float = reinterpret_cast<const float *>(mask_tensor);
+    const float *proto_tensor_float =
+        reinterpret_cast<const float *>(proto_tensor);
+    const int8_t *mask_tensor_int8 =
+        reinterpret_cast<const int8_t *>(mask_tensor);
+    const int8_t *proto_tensor_int8 =
+        reinterpret_cast<const int8_t *>(proto_tensor);
+    bool is_qnt = zero_points_.empty() ? false : true;
+#define COUNT 32
+    float mask[COUNT] = {0};
+    cv::Mat proto;
+    if (model_format_ != ModelFormat::RKNN_FORMAT)
+    {
+        for (int i = 0; i < COUNT; i++)
+        {
+            mask[i] =
+                mask_tensor_float[bboxes_idx.sub_index + i * bboxes_idx.grid_len];
+        }
+        proto = cv::Mat(COUNT, seg_height_ * seg_width_, CV_32FC1,
+                        const_cast<float *>(proto_tensor_float));
+    }
+    else
+    {
+        auto mask_zp = zero_points_.at(bboxes_idx.index * output_per_branch + 3);
+        auto mask_scale = scale_.at(bboxes_idx.index * output_per_branch + 3);
+        auto proto_zp = zero_points_.at(num_of_layers_ - 1);
+        auto proto_scale = scale_.at(num_of_layers_ - 1);
+        // LOG_INFO("mask: {}, {}, proto: {} {}", mask_zp, mask_scale,
+        //                    proto_zp, proto_scale);
+        for (int i = 0; i < COUNT; ++i)
+        {
+            auto &element =
+                mask_tensor_int8[bboxes_idx.sub_index + i * bboxes_idx.grid_len];
+            mask[i] =
+                is_qnt ? deqnt_affine_to_f32(element, mask_zp, mask_scale) : 0.0f;
+        }
+        proto = cv::Mat::zeros(COUNT, seg_height_ * seg_width_, CV_32FC1);
+        if (is_qnt)
+        {
+            float *proto_ptr = proto.ptr<float>();
+            for (int i = 0; i < COUNT * seg_height_ * seg_width_; ++i)
+            {
+                auto &element = proto_tensor_int8[i];
+                proto_ptr[i] = deqnt_affine_to_f32(element, proto_zp, proto_scale);
+            }
+        }
+    }
+    cv::Mat mask_mat = cv::Mat(1, COUNT, CV_32FC1, mask);
+    cv::Mat res_mat = mask_mat * proto;
+    res_mat = res_mat.reshape(0, seg_height_);
+    auto image_scale = model_height_ / seg_height_;
+    auto roi = cv::Rect(result.box.x1 / image_scale, result.box.y1 / image_scale,
+                        (result.box.x2 - result.box.x1) / image_scale,
+                        (result.box.y2 - result.box.y1) / image_scale);
+    auto sub_image = res_mat(roi);
+    cv::Mat sub_res_image = sub_image > 0.5;
+    result.seg_mat = cv::Mat::zeros(res_mat.size(), CV_8UC1);
+    sub_res_image.copyTo(result.seg_mat(roi));
+}
+
+static void compute_dfl(float *tensor, int dfl_len, float *box)
+{
+    for (int b = 0; b < 4; b++)
+    {
+        float exp_t[dfl_len];
+        float exp_sum = 0;
+        float acc_sum = 0;
+        for (int i = 0; i < dfl_len; i++)
+        {
+            exp_t[i] = exp(tensor[i + b * dfl_len]);
+            exp_sum += exp_t[i];
+        }
+
+        for (int i = 0; i < dfl_len; i++)
+        {
+            acc_sum += exp_t[i] / exp_sum * i;
+        }
+        box[b] = acc_sum;
+    }
+}
+
+uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_tensor,
+                                    const void *sum_score_tensor, int grid_w, int grid_h,
+                                    int stride, int index, int output_per_branch)
+{
+    const float *box_tensor_float = reinterpret_cast<const float *>(box_tensor);
+    const float *score_tensor_float = reinterpret_cast<const float *>(score_tensor);
+    const int8_t *box_tensor_int8 = reinterpret_cast<const int8_t *>(box_tensor);
+    const int8_t *score_tensor_int8 = reinterpret_cast<const int8_t *>(score_tensor);
+    const uint16_t *box_tensor_fp16 = reinterpret_cast<const uint16_t *>(box_tensor);
+    const uint16_t *score_tensor_fp16 = reinterpret_cast<const uint16_t *>(score_tensor);
+    bool is_qnt = zero_points_.empty() ? false : true;
+
+    // fp16 模型 zp=0, scale=1 是占位值，不是真正的量化
+    if (is_qnt)
+    {
+        bool all_placeholder = true;
+        for (size_t s = 0; s < scale_.size(); ++s)
+        {
+            if (std::abs(scale_[s] - 1.0f) > 1e-6f || zero_points_[s] != 0)
+            {
+                all_placeholder = false;
+                break;
+            }
+        }
+        if (all_placeholder)
+        {
+            is_qnt = false;
+        }
+    }
+
+    uint16_t valid_count = 0;
+    int grid_len = grid_w * grid_h;
+
+    // RTMDet: 前半部分 outputs 是分类置信度 scores，后半部分是 bbox 预测
+    int cls_layers = output_per_branch;
+    int bbox_zp_idx = index + cls_layers;
+
+    for (int i = 0; i < grid_h; ++i)
+    {
+        for (int j = 0; j < grid_w; ++j)
+        {
+            int offset = i * grid_w + j;
+            float max_score_float = 0;
+            int max_class_id = -1;
+
+            // 1. 处理分类得分 (包含 Sigmoid 激活)
+            for (size_t k = 0; k < conf_threshold_->size(); ++k)
+            {
+                float raw_score = 0.0f;
+
+                if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                    model_format_ == ModelFormat::TRT_FORMAT ||
+                    model_format_ == ModelFormat::NNRT_FORMAT)
                 {
-                    max_score = prob;
-                    best_cls = c;
+                    raw_score = score_tensor_float[offset];
                 }
+                else if (model_format_ == ModelFormat::RKNN_FORMAT)
+                {
+                    if (is_qnt)
+                    {
+                        // int8 量化 → 反量化
+                        raw_score = deqnt_affine_to_f32(score_tensor_int8[offset],
+                                                        zero_points_.at(index),
+                                                        scale_.at(index));
+                    }
+                    else
+                    {
+                        // fp16 非量化 → 直接转换
+                        raw_score = fp16_to_f32(score_tensor_fp16[offset]);
+                    }
+                }
+
+                // RTMDet 对 raw score 进行 sigmoid 操作
+                float score = 1.0f / (1.0f + std::exp(-raw_score));
+
+                if (score >= conf_threshold_->at(k) && score > max_score_float)
+                {
+                    max_score_float = score;
+                    max_class_id = k;
+                }
+
+                offset += grid_len;
             }
 
-            if (max_score <= params_.score_thr)
-                continue;
+            // 2. 边界框解码 (对应 Python 中的 decoded_bbox 逻辑)
+            if (max_class_id != -1)
+            {
+                offset = i * grid_w + j;
+                float l, r, t, b_val;
 
-            // --- 处理 bbox_pred: [4, H, W] NCHW 排列 ---
-            // 通道顺序 (mmdeploy RTMDet): [l, r, t, b]
-            float l = box_ptr[0 * H * W + a];
-            float r = box_ptr[1 * H * W + a];
-            float t = box_ptr[2 * H * W + a];
-            float b = box_ptr[3 * H * W + a];
+                if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                    model_format_ == ModelFormat::TRT_FORMAT ||
+                    model_format_ == ModelFormat::NNRT_FORMAT)
+                {
+                    l = box_tensor_float[offset + 0 * grid_len];
+                    r = box_tensor_float[offset + 1 * grid_len];
+                    t = box_tensor_float[offset + 2 * grid_len];
+                    b_val = box_tensor_float[offset + 3 * grid_len];
+                }
+                else if (model_format_ == ModelFormat::RKNN_FORMAT)
+                {
+                    if (is_qnt)
+                    {
+                        l = deqnt_affine_to_f32(box_tensor_int8[offset + 0 * grid_len],
+                                                zero_points_.at(bbox_zp_idx),
+                                                scale_.at(bbox_zp_idx));
+                        r = deqnt_affine_to_f32(box_tensor_int8[offset + 1 * grid_len],
+                                                zero_points_.at(bbox_zp_idx),
+                                                scale_.at(bbox_zp_idx));
+                        t = deqnt_affine_to_f32(box_tensor_int8[offset + 2 * grid_len],
+                                                zero_points_.at(bbox_zp_idx),
+                                                scale_.at(bbox_zp_idx));
+                        b_val = deqnt_affine_to_f32(box_tensor_int8[offset + 3 * grid_len],
+                                                    zero_points_.at(bbox_zp_idx),
+                                                    scale_.at(bbox_zp_idx));
+                    }
+                    else
+                    {
+                        l = fp16_to_f32(box_tensor_fp16[offset + 0 * grid_len]);
+                        r = fp16_to_f32(box_tensor_fp16[offset + 1 * grid_len]);
+                        t = fp16_to_f32(box_tensor_fp16[offset + 2 * grid_len]);
+                        b_val = fp16_to_f32(box_tensor_fp16[offset + 3 * grid_len]);
+                    }
+                }
 
-            float cx = priors[a].first;
-            float cy = priors[a].second;
+                // 核心对齐：配合 Python 代码 get_multi_level_priors (offset=0)
+                // priors 使用格点左上角坐标 (j*stride, i*stride)，非中心点
+                float cx = j * stride;
+                float cy = i * stride;
 
-            Box box;
-            box.x1 = cx - l;
-            box.y1 = cy - t;
-            box.x2 = cx + r;
-            box.y2 = cy + b;
+                Bbox _bbox;
+                _bbox.x1 = cx - l;
+                _bbox.y1 = cy - t;
+                _bbox.x2 = cx + r;
+                _bbox.y2 = cy + b_val;
 
-            // 裁剪到图像范围内
-            box.x1 = std::max(0.0f, std::min(box.x1, static_cast<float>(params_.input_width)));
-            box.y1 = std::max(0.0f, std::min(box.y1, static_cast<float>(params_.input_height)));
-            box.x2 = std::max(0.0f, std::min(box.x2, static_cast<float>(params_.input_width)));
-            box.y2 = std::max(0.0f, std::min(box.y2, static_cast<float>(params_.input_height)));
+                // 过滤异常框
+                if (std::abs(_bbox.x1 - _bbox.x2) < 1 || std::abs(_bbox.y1 - _bbox.y2) < 1)
+                {
+                    continue;
+                }
 
-            candidate_boxes.push_back(box);
-            candidate_scores.push_back(max_score);
-            candidate_labels.push_back(best_cls);
+                bboxes_.push_back(_bbox);
+                class_id_.push_back(max_class_id);
+                obj_probs_.push_back(max_score_float);
+                bboxes_idx_.push_back({index, i * grid_w + j, grid_len});
+                valid_count++;
+            }
         }
     }
-
-    // --- 3. NMS ---
-    std::vector<int> keep_idx = Nms(candidate_boxes, candidate_scores, params_.nms_iou);
-
-    // --- 4. TopK ---
-    if (static_cast<int>(keep_idx.size()) > params_.max_per_img)
-        keep_idx.resize(params_.max_per_img);
-
-    // --- 5. 组装结果 ---
-    std::vector<Detection> results;
-    results.reserve(keep_idx.size());
-    for (int idx : keep_idx)
-    {
-        Detection det;
-        det.x1 = candidate_boxes[idx].x1;
-        det.y1 = candidate_boxes[idx].y1;
-        det.x2 = candidate_boxes[idx].x2;
-        det.y2 = candidate_boxes[idx].y2;
-        det.score = candidate_scores[idx];
-        det.class_id = candidate_labels[idx];
-        results.push_back(det);
-    }
-
-    LOG_INFO("RTMDet postprocess: {} raw candidates → {} after NMS → {} final",
-             candidate_boxes.size(), keep_idx.size(), results.size());
-
-    return results;
+    return valid_count;
 }
 
-// ==================== 生成 Prior 中心点 ====================
-
-std::vector<std::pair<float, float>> RtmdetPostProcess::GeneratePriors(
-    int stride, int h, int w)
+uint16_t PostProcess::ProcessPose(const void *box_tensor,
+                                  const void *score_tensor,
+                                  const void *kpt_tensor,
+                                  const void *visibility_tensor, int grid_w,
+                                  int grid_h, int stride, int index,
+                                  int output_per_branch)
 {
-    std::vector<std::pair<float, float>> priors;
-    priors.reserve(h * w);
-
-    for (int y = 0; y < h; ++y)
+    const float *box_tensor_float = reinterpret_cast<const float *>(box_tensor);
+    const float *score_tensor_float =
+        reinterpret_cast<const float *>(score_tensor);
+    const float *kpt_tensor_float = reinterpret_cast<const float *>(kpt_tensor);
+    const float *visibility_tensor_float =
+        reinterpret_cast<const float *>(visibility_tensor);
+    const int8_t *box_tensor_int8 = reinterpret_cast<const int8_t *>(box_tensor);
+    const int8_t *score_tensor_int8 =
+        reinterpret_cast<const int8_t *>(score_tensor);
+    const int8_t *kpt_tensor_int8 = reinterpret_cast<const int8_t *>(kpt_tensor);
+    const int8_t *visibility_tensor_int8 =
+        reinterpret_cast<const int8_t *>(visibility_tensor);
+    bool is_qnt = zero_points_.empty() ? false : true;
+    int8_t score_thres_i8 =
+        is_qnt ? qnt_f32_to_affine(conf_threshold_->at(0),
+                                   zero_points_.at(index * output_per_branch + 1),
+                                   scale_.at(index * output_per_branch + 1))
+               : 0;
+    uint16_t valid_count = 0;
+    int grid_len = grid_w * grid_h;
+    for (int i = 0; i < grid_h; ++i)
     {
-        // 网格左上角坐标 (offset=0, 与 mmdeploy RTMDet 一致)
-        float cy = static_cast<float>(y) * static_cast<float>(stride);
-        for (int x = 0; x < w; ++x)
+        for (int j = 0; j < grid_w; ++j)
         {
-            float cx = static_cast<float>(x) * static_cast<float>(stride);
-            priors.emplace_back(cx, cy);
+            int offset = i * grid_w + j;
+            float max_score_float = 0;
+            int8_t max_score_int8 =
+                is_qnt ? qnt_f32_to_affine(
+                             0.0f, zero_points_.at(index * output_per_branch + 1),
+                             scale_.at(index * output_per_branch + 1))
+                       : 0;
+            int max_class_id = -1;
+            // 因为pose这个模型只是检测人的类型，所以只有一个种类
+            if (model_format_ == ModelFormat::TRT_FORMAT ||
+                model_format_ == ModelFormat::ONNX_FORMAT ||
+                model_format_ == ModelFormat::NNRT_FORMAT)
+            {
+                if (score_tensor_float[offset] > conf_threshold_->at(0) &&
+                    score_tensor_float[offset] > max_score_float)
+                {
+                    max_score_float = score_tensor_float[offset];
+                    max_class_id = 0;
+                }
+            }
+            else if (model_format_ == ModelFormat::RKNN_FORMAT)
+            {
+                if (score_tensor_int8[offset] > score_thres_i8 &&
+                    score_tensor_int8[offset] > max_score_int8)
+                {
+                    max_score_int8 = score_tensor_int8[offset];
+                    max_class_id = 0;
+                }
+            }
+            if (max_class_id != -1)
+            {
+                offset = i * grid_w + j;
+                float box[4];
+                float before_dfl[dfl_len_ * 4];
+                for (int k = 0; k < dfl_len_ * 4; ++k)
+                {
+                    if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                        model_format_ == ModelFormat::NNRT_FORMAT ||
+                        model_format_ == ModelFormat::TRT_FORMAT)
+                    {
+                        before_dfl[k] = box_tensor_float[offset];
+                    }
+                    else if (model_format_ == ModelFormat::RKNN_FORMAT)
+                    {
+                        before_dfl[k] =
+                            is_qnt ? deqnt_affine_to_f32(
+                                         box_tensor_int8[offset],
+                                         zero_points_.at(index * output_per_branch),
+                                         scale_.at(index * output_per_branch))
+                                   : 0;
+                    }
+                    offset += grid_len;
+                }
+                compute_dfl(before_dfl, dfl_len_, box);
+                Bbox _bbox;
+                _bbox.x1 = (-box[0] + j + 0.5) * stride;
+                _bbox.y1 = (-box[1] + i + 0.5) * stride;
+                _bbox.x2 = (box[2] + j + 0.5) * stride;
+                _bbox.y2 = (box[3] + i + 0.5) * stride;
+                bboxes_.push_back(_bbox);
+                class_id_.push_back(max_class_id);
+                if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                    model_format_ == ModelFormat::NNRT_FORMAT ||
+                    model_format_ == ModelFormat::TRT_FORMAT)
+                {
+                    obj_probs_.push_back(max_score_float);
+                    offset = i * grid_w + j;
+                    for (int k = 0; k < 17; ++k)
+                    {
+                        auto kpt_x = *(kpt_tensor_float + offset + 2 * k * grid_len);
+                        auto kpt_y = *(kpt_tensor_float + offset + (2 * k + 1) * grid_len);
+                        auto kpt_visibility =
+                            *(visibility_tensor_float + offset + k * grid_len);
+                        kpt.push_back(kpt_x);
+                        kpt.push_back(kpt_y);
+                        visibilities.push_back(kpt_visibility);
+                    }
+                }
+                else if (model_format_ == ModelFormat::RKNN_FORMAT)
+                {
+                    auto max_score =
+                        is_qnt ? deqnt_affine_to_f32(
+                                     max_score_int8,
+                                     zero_points_.at(index * output_per_branch + 1),
+                                     scale_.at(index * output_per_branch + 1))
+                               : 0;
+                    obj_probs_.push_back(max_score);
+                    offset = i * grid_w + j;
+                    for (int k = 0; k < 17; ++k)
+                    {
+                        auto kpt_x = *(kpt_tensor_int8 + offset + 2 * k * grid_len);
+                        auto kpt_y = *(kpt_tensor_int8 + offset + (2 * k + 1) * grid_len);
+                        auto kpt_visibility =
+                            *(visibility_tensor_int8 + offset + k * grid_len);
+                        auto x =
+                            is_qnt
+                                ? deqnt_affine_to_f32(
+                                      kpt_x, zero_points_.at(index * output_per_branch + 2),
+                                      scale_.at(index * output_per_branch + 2))
+                                : 0;
+                        auto y =
+                            is_qnt
+                                ? deqnt_affine_to_f32(
+                                      kpt_y, zero_points_.at(index * output_per_branch + 2),
+                                      scale_.at(index * output_per_branch + 2))
+                                : 0;
+                        auto visibility =
+                            is_qnt ? deqnt_affine_to_f32(
+                                         kpt_visibility,
+                                         zero_points_.at(index * output_per_branch + 3),
+                                         scale_.at(index * output_per_branch + 3))
+                                   : 0;
+                        kpt.push_back(x);
+                        kpt.push_back(y);
+                        visibilities.push_back(visibility);
+                    }
+                }
+                valid_count++;
+            }
         }
     }
-    return priors;
+    return valid_count;
 }
 
-// ==================== Sigmoid ====================
-
-float RtmdetPostProcess::Sigmoid(float x)
+uint16_t PostProcess::ProcessDetect(const void *box_tensor,
+                                    const void *score_tensor,
+                                    const void *sum_score_tensor,
+                                    int grid_w, int grid_h, int stride,
+                                    int index, int output_per_branch)
 {
-    return 1.0f / (1.0f + std::exp(-x));
-}
+    const float *box_tensor_float = reinterpret_cast<const float *>(box_tensor);
+    const float *score_tensor_float =
+        reinterpret_cast<const float *>(score_tensor);
+    const float *sum_score_tensor_float =
+        reinterpret_cast<const float *>(sum_score_tensor);
+    const int8_t *box_tensor_int8 = reinterpret_cast<const int8_t *>(box_tensor);
+    const int8_t *score_tensor_int8 =
+        reinterpret_cast<const int8_t *>(score_tensor);
+    const int8_t *sum_score_tensor_int8 =
+        reinterpret_cast<const int8_t *>(sum_score_tensor);
+    bool is_qnt = zero_points_.empty() ? false : true;
+    int8_t score_sum_thres_i8 =
+        is_qnt ? qnt_f32_to_affine(sum_conf_threshold_,
+                                   zero_points_.at(index * output_per_branch + 2),
+                                   scale_.at(index * output_per_branch + 2))
+               : 0;
 
-// ==================== ComputeIoU ====================
-
-float RtmdetPostProcess::ComputeIoU(const Box &a, const Box &b)
-{
-    float inter_x1 = std::max(a.x1, b.x1);
-    float inter_y1 = std::max(a.y1, b.y1);
-    float inter_x2 = std::min(a.x2, b.x2);
-    float inter_y2 = std::min(a.y2, b.y2);
-
-    float inter_w = std::max(0.0f, inter_x2 - inter_x1);
-    float inter_h = std::max(0.0f, inter_y2 - inter_y1);
-    float inter_area = inter_w * inter_h;
-
-    float area_a = (a.x2 - a.x1) * (a.y2 - a.y1);
-    float area_b = (b.x2 - b.x1) * (b.y2 - b.y1);
-    float union_area = area_a + area_b - inter_area;
-
-    if (union_area <= 0.0f)
-        return 0.0f;
-    return inter_area / union_area;
-}
-
-// ==================== NMS (贪心, 按 score 降序) ====================
-
-std::vector<int> RtmdetPostProcess::Nms(
-    const std::vector<Box> &boxes,
-    const std::vector<float> &scores,
-    float iou_thr)
-{
-    const int N = static_cast<int>(boxes.size());
-    if (N == 0)
-        return {};
-
-    // 按分数降序排列索引
-    std::vector<int> order(N);
-    std::iota(order.begin(), order.end(), 0);
-    std::sort(order.begin(), order.end(),
-              [&scores](int a, int b)
-              { return scores[a] > scores[b]; });
-
-    std::vector<int> keep;
-    std::vector<bool> suppressed(N, false);
-
-    for (int i = 0; i < N; ++i)
+    uint16_t valid_count = 0;
+    int grid_len = grid_w * grid_h;
+    for (int i = 0; i < grid_h; i++)
     {
-        int idx_i = order[i];
-        if (suppressed[idx_i])
-            continue;
-
-        keep.push_back(idx_i);
-
-        for (int j = i + 1; j < N; ++j)
+        for (int j = 0; j < grid_w; ++j)
         {
-            int idx_j = order[j];
-            if (suppressed[idx_j])
-                continue;
-
-            float iou = ComputeIoU(boxes[idx_i], boxes[idx_j]);
-            if (iou > iou_thr)
-                suppressed[idx_j] = true;
+            int offset = i * grid_w + j;
+            if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                model_format_ == ModelFormat::TRT_FORMAT ||
+                model_format_ == ModelFormat::NNRT_FORMAT)
+            {
+                if (sum_score_tensor_float[offset] < sum_conf_threshold_)
+                {
+                    continue;
+                }
+            }
+            else if (model_format_ == ModelFormat::RKNN_FORMAT)
+            {
+                if (sum_score_tensor_int8[offset] < score_sum_thres_i8)
+                {
+                    continue;
+                }
+            }
+            float max_score_float = 0;
+            int8_t max_score_int8 =
+                is_qnt ? qnt_f32_to_affine(
+                             0.0f, zero_points_.at(index * output_per_branch + 1),
+                             scale_.at(index * output_per_branch + 1))
+                       : 0;
+            int max_class_id = -1;
+            for (size_t k = 0; k < conf_threshold_->size(); ++k)
+            {
+                if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                    model_format_ == ModelFormat::TRT_FORMAT ||
+                    model_format_ == ModelFormat::NNRT_FORMAT)
+                {
+                    if (score_tensor_float[offset] > conf_threshold_->at(k) &&
+                        score_tensor_float[offset] > max_score_float)
+                    {
+                        max_score_float = score_tensor_float[offset];
+                        max_class_id = k;
+                    }
+                }
+                else if (model_format_ == ModelFormat::RKNN_FORMAT)
+                {
+                    auto score_thres_i8 =
+                        is_qnt ? qnt_f32_to_affine(
+                                     conf_threshold_->at(k),
+                                     zero_points_.at(index * output_per_branch + 1),
+                                     scale_.at(index * output_per_branch + 1))
+                               : 0;
+                    if (score_tensor_int8[offset] > score_thres_i8 &&
+                        score_tensor_int8[offset] > max_score_float)
+                    {
+                        max_score_int8 = score_tensor_int8[offset];
+                        max_class_id = k;
+                    }
+                }
+                offset += grid_len;
+            }
+            if (max_class_id != -1)
+            {
+                offset = i * grid_w + j;
+                float box[4];
+                float before_dfl[dfl_len_ * 4];
+                for (int k = 0; k < dfl_len_ * 4; ++k)
+                {
+                    if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                        model_format_ == ModelFormat::TRT_FORMAT ||
+                        model_format_ == ModelFormat::NNRT_FORMAT)
+                    {
+                        before_dfl[k] = box_tensor_float[offset];
+                    }
+                    else if (model_format_ == ModelFormat::RKNN_FORMAT)
+                    {
+                        before_dfl[k] =
+                            is_qnt ? deqnt_affine_to_f32(
+                                         box_tensor_int8[offset],
+                                         zero_points_.at(index * output_per_branch),
+                                         scale_.at(index * output_per_branch))
+                                   : 0;
+                    }
+                    offset += grid_len;
+                }
+                Bbox _bbox;
+                if (model_type_ == ModelType::DETECTION_V26 ||
+                    model_type_ == ModelType::DETECTION_V10)
+                {
+                    _bbox.x1 = (-before_dfl[0] + j + 0.5) * stride;
+                    _bbox.y1 = (-before_dfl[1] + i + 0.5) * stride;
+                    _bbox.x2 = (before_dfl[2] + j + 0.5) * stride;
+                    _bbox.y2 = (before_dfl[3] + i + 0.5) * stride;
+                }
+                else
+                {
+                    compute_dfl(before_dfl, dfl_len_, box);
+                    _bbox.x1 = (-box[0] + j + 0.5) * stride;
+                    _bbox.y1 = (-box[1] + i + 0.5) * stride;
+                    _bbox.x2 = (box[2] + j + 0.5) * stride;
+                    _bbox.y2 = (box[3] + i + 0.5) * stride;
+                }
+                int width_pixel_delta = 1;
+                int height_pixel_delta = 1;
+                if (model_type_ == ModelType::SEGMENT_V11)
+                {
+                    height_pixel_delta = model_height_ / seg_height_;
+                    width_pixel_delta = model_width_ / seg_width_;
+                }
+                if (std::abs(_bbox.x1 - _bbox.x2) < width_pixel_delta)
+                {
+                    LOG_WARN("bbox width is too small: {}",
+                             std::abs(_bbox.x1 - _bbox.x2));
+                    continue;
+                }
+                if (std::abs(_bbox.y1 - _bbox.y2) < height_pixel_delta)
+                {
+                    LOG_WARN("bbox height is too small: {}",
+                             std::abs(_bbox.y1 - _bbox.y2));
+                    continue;
+                }
+                bboxes_.push_back(_bbox);
+                if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                    model_format_ == ModelFormat::TRT_FORMAT ||
+                    model_format_ == ModelFormat::NNRT_FORMAT)
+                {
+                    obj_probs_.push_back(max_score_float);
+                }
+                else if (model_format_ == ModelFormat::RKNN_FORMAT)
+                {
+                    auto max_score =
+                        is_qnt ? deqnt_affine_to_f32(
+                                     max_score_int8,
+                                     zero_points_.at(index * output_per_branch + 1),
+                                     scale_.at(index * output_per_branch + 1))
+                               : 0;
+                    obj_probs_.push_back(max_score);
+                    //                              LOG_INFO("max_score: {} {},
+                    //                              id: {}, box[{} {} {} {}]",
+                    //                                                 max_score,
+                    //                                                 max_score_int8,
+                    //                                                 max_class_id,
+                    //                                                 _bbox.x1, _bbox.y1,
+                    //                                                 _bbox.x2,
+                    //                                                 _bbox.y2);
+                }
+                class_id_.push_back(max_class_id);
+                bboxes_idx_.push_back({index, i * grid_w + j, grid_len});
+                valid_count++;
+            }
         }
     }
-
-    return keep;
+    return valid_count;
 }

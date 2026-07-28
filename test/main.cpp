@@ -2,210 +2,146 @@
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+#include <memory>
 
 #include <opencv2/opencv.hpp>
 
 #include "engine/ai_instance.h"
 #include "image_process/yolo/yolo_postprocess.h"
-
-// ==================== FP16 ↔ FP32 ====================
-
-static inline uint16_t f32_to_f16(float val)
-{
-    uint32_t x;
-    std::memcpy(&x, &val, sizeof(float));
-    uint16_t sign = (x >> 16) & 0x8000;
-    int exp = static_cast<int>((x >> 23) & 0xFF) - 127 + 15;
-    uint32_t mant = (x >> 13) & 0x3FF;
-    if (((x >> 23) & 0xFF) == 0)
-        return sign;
-    if (exp >= 31)
-        return sign | 0x7C00;
-    if (exp <= 0)
-        return sign;
-    return sign | (exp << 10) | mant;
-}
-
-static inline float f16_to_f32(uint16_t h)
-{
-    uint32_t sign = (h >> 15) & 1, exp = (h >> 10) & 0x1F, mant = h & 0x3FF;
-    if (exp == 0)
-        return 0.0f;
-    if (exp == 31)
-        return sign ? -INFINITY : INFINITY;
-    uint32_t f = (sign << 31) | ((exp + 127 - 15) << 23) | (mant << 13);
-    float result;
-    std::memcpy(&result, &f, sizeof(float));
-    return result;
-}
-
-// ==================== NPU Native Layout 解包 ====================
-// RK3588 NPU zero-copy 输出为 native layout (fmt=2):
-// 数据以 16-way channel interleave 方式存储
-// 对于每个 (h,w)，16 个连续的 FP16 值对应 16 个 padded channel
-// 有效 channel 0..C-1，padding channel C..15 为 0
-
-static void unpack_native_fp16_to_fp32(
-    const void *raw, int /*mem_size_bytes*/,
-    int C, int H, int W, float *dst)
-{
-    const uint16_t *src = static_cast<const uint16_t *>(raw);
-    const int NATIVE_C = 16;
-
-    for (int h = 0; h < H; ++h)
-    {
-        for (int w = 0; w < W; ++w)
-        {
-            int base = (h * W + w) * NATIVE_C;
-            for (int c = 0; c < C; ++c)
-                dst[c * H * W + h * W + w] = f16_to_f32(src[base + c]);
-        }
-    }
-}
-
-// ==================== main ====================
+#include "image_process/yolo/yolo_preprocess.h"
 
 int main()
 {
-    // === 1. 加载模型 ===
+    // === 1. 加载模型（Rk3588 → TensorData → BindInputAndOutput） ===
     const char *model_path =
         "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320-fp16.rknn";
-    printf("[1/5] Loading model: %s\n", model_path);
+    printf("[1/6] Loading model: %s\n", model_path);
     auto engine = ai_framework::Engine(ai_framework::RKNN_FORMAT, model_path);
 
-    // === 2. 读取图片 ===
+    // 获取 tensor 指针（Engine 内部已完成 Rk3588::Initialize +
+    // TensorData 构造 + BindInputAndOutput）
+    auto input = engine.get_input_tensor_ptr();
+    auto output = engine.get_output_tensor_ptr();
+
+    // 获取模型配置
+    const auto &config = engine.get_config();
+    auto input_shape =
+        config.input_layer_shape.at(config.input_index_to_name.at(0));
+    // 模型输入可能是 NHWC(1,H,W,C) 或 NCHW(1,C,H,W)，取 H 和 W
+    // NHWC: at(1)=H, at(2)=W, at(3)=C | NCHW: at(1)=C, at(2)=H, at(3)=W
+    int model_height, model_width;
+    if (input_shape.size() >= 4)
+    {
+        auto fmt_str = config.input_fmt_str.at(config.input_index_to_name.at(0));
+        if (fmt_str == "NHWC")
+        {
+            model_height = static_cast<int>(input_shape.at(1));
+            model_width = static_cast<int>(input_shape.at(2));
+        }
+        else
+        {
+            model_height = static_cast<int>(input_shape.at(2));
+            model_width = static_cast<int>(input_shape.at(3));
+        }
+    }
+    else
+    {
+        model_height = model_width = 320;
+    }
+    int target_side = std::max(model_height, model_width);
+    printf("[2/6] Model input: %dx%d (fmt=%s), outputs: %d\n",
+           model_width, model_height,
+           config.input_fmt_str.at(config.input_index_to_name.at(0)).c_str(),
+           config.output_tensors_count);
+
+    // === 3. 读取图片 ===
     const char *img_path =
-        "/home/orangepi/Code/inference-rknn/resources/img/test.jpg";
-    printf("[2/5] Reading image: %s\n", img_path);
+        "/home/orangepi/Code/ai_framework/source/2024_09_13_08_30_25_001_cbw.jpg";
+    printf("[3/6] Reading image: %s\n", img_path);
     cv::Mat img = cv::imread(img_path);
     if (img.empty())
     {
-        printf("ERROR: Failed to read image\n");
+        printf("ERROR: Failed to load image: %s\n", img_path);
         return -1;
     }
-    printf("      original: %dx%d\n", img.cols, img.rows);
+    printf("  Image size: %dx%d\n", img.cols, img.rows);
 
-    // === 3. Letterbox + 归一化 → FP16 NHWC ===
-    printf("[3/5] Letterbox 320x320 → FP16 NHWC...\n");
-    const int TARGET_W = 320, TARGET_H = 320;
+    // === 4. 预处理 ===
+    // 与 Python bbox_preprocess 一致：letterbox (resize + pad)，uint8 直传，不做归一化
+    printf("[4/6] Preprocessing...\n");
+    YoloPreProcess preprocess(target_side, false);
+    preprocess.Run({img}, input);
 
-    float scale = std::min(
-        static_cast<float>(TARGET_W) / img.cols,
-        static_cast<float>(TARGET_H) / img.rows);
-    int scaled_w = static_cast<int>(std::round(img.cols * scale));
-    int scaled_h = static_cast<int>(std::round(img.rows * scale));
-    int pad_x = (TARGET_W - scaled_w) / 2;
-    int pad_y = (TARGET_H - scaled_h) / 2;
-    printf("      scale=%.3f  pad=(%d,%d)\n", scale, pad_x, pad_y);
-
-    cv::Mat resized, canvas(TARGET_H, TARGET_W, CV_8UC3, cv::Scalar(114, 114, 114));
-    cv::resize(img, resized, cv::Size(scaled_w, scaled_h), 0, 0, cv::INTER_LINEAR);
-    resized.copyTo(canvas(cv::Rect(pad_x, pad_y, scaled_w, scaled_h)));
-
-    uint16_t *input_fp16 = static_cast<uint16_t *>(engine.get_input_tensor_ptr()[0]);
-    for (int y = 0; y < TARGET_H; ++y)
-    {
-        const uint8_t *row = canvas.ptr<uint8_t>(y);
-        for (int x = 0; x < TARGET_W; ++x)
-        {
-            // === 归一化方案 (按需切换) ===
-            // 方案A: mmdet 标准 BGR 归一化 (适用于未 bake 预处理的模型)
-            // float b = (row[x*3+0] - 103.53f) / 57.375f;
-            // float g = (row[x*3+1] - 116.28f) / 57.12f;
-            // float r = (row[x*3+2] - 123.675f) / 58.395f;
-
-            // 方案B: BGR / 255 → [0,1] (适用于 bake 了 /255 的模型)
-            // float b = row[x*3+0] / 255.0f;
-            // float g = row[x*3+1] / 255.0f;
-            // float r = row[x*3+2] / 255.0f;
-
-            // 方案C: 原始 BGR [0,255] (适用于 mmdeploy 导出、预处理已 bake)
-            float b = static_cast<float>(row[x * 3 + 0]);
-            float g = static_cast<float>(row[x * 3 + 1]);
-            float r = static_cast<float>(row[x * 3 + 2]);
-
-            int base = (y * TARGET_W + x) * 3;
-            input_fp16[base + 0] = f32_to_f16(b);
-            input_fp16[base + 1] = f32_to_f16(g);
-            input_fp16[base + 2] = f32_to_f16(r);
-        }
-    }
-
-    // === 4. 推理 ===
-    printf("[4/5] Running inference...\n");
+    // === 5. 推理 ===
+    printf("[5/6] Running inference...\n");
     engine.DoInference();
+    printf("  Inference done.\n");
 
-    // === 5. 后处理 & 保存 ===
-    printf("[5/5] Postprocess & draw...\n");
-    const void *const *outputs = engine.get_output_tensor_ptr();
-    int out_count = engine.get_output_tensor_count();
-    printf("      output tensors: %d\n", out_count);
+    // === 6. 后处理 ===
+    printf("[6/6] Postprocessing...\n");
+    std::vector<float> conf_threshold = {0.5f};
+    float sum_conf_threshold = 0.5f;
 
-    // 输出配置: {n_elems, C, H, W, mem_size_bytes}
-    struct OutInfo
+    PostProcess postprocess(config, conf_threshold, sum_conf_threshold, 0.5f);
+
+    // 构建 output tensors（const_cast 仅用于 PostProcess 读取）
+    int output_count = engine.get_output_tensor_count();
+    std::vector<void *> out_vec(output_count);
+    for (int i = 0; i < output_count; ++i)
     {
-        int elems, C, H, W, mem_size;
-    };
-    const OutInfo out_info[6] = {
-        {1600, 1, 40, 40, 51200}, // cls_P3
-        {400, 1, 20, 20, 12800},  // cls_P4
-        {100, 1, 10, 10, 3200},   // cls_P5
-        {6400, 4, 40, 40, 51200}, // box_P3
-        {1600, 4, 20, 20, 12800}, // box_P4
-        {400, 4, 10, 10, 3200},   // box_P5
-    };
+        out_vec[i] = const_cast<void *>(output[i]);
+    }
+    void **out_tensors = out_vec.data();
+    postprocess.Run(out_tensors);
 
-    std::vector<const float *> output_fp32(6);
-    std::vector<float *> fp32_bufs(6);
-    for (int i = 0; i < 6; ++i)
+    // === 7. 绘制结果 ===
+    const auto &results = postprocess.get_result();
+    printf("  Detected %zu objects:\n", results.size());
+
+    // 缩放比例：预处理时 YoloPreProcess 将长边等比缩放再 padding
+    float ratio = (img.cols >= img.rows)
+                      ? (1.0f * img.cols / target_side)
+                      : (1.0f * img.rows / target_side);
+
+    const char *label_names[] = {"skeleton"};
+
+    for (size_t i = 0; i < results.size(); ++i)
     {
-        fp32_bufs[i] = new float[out_info[i].elems];
-        unpack_native_fp16_to_fp32(
-            outputs[i], out_info[i].mem_size,
-            out_info[i].C, out_info[i].H, out_info[i].W,
-            fp32_bufs[i]);
-        output_fp32[i] = fp32_bufs[i];
+        const auto &res = results[i];
+
+        int x1 = std::max(0, std::min(static_cast<int>(res.box.x1 * ratio), img.cols - 1));
+        int y1 = std::max(0, std::min(static_cast<int>(res.box.y1 * ratio), img.rows - 1));
+        int x2 = std::max(0, std::min(static_cast<int>(res.box.x2 * ratio), img.cols - 1));
+        int y2 = std::max(0, std::min(static_cast<int>(res.box.y2 * ratio), img.rows - 1));
+
+        const char *label = (res.class_id >= 0 && res.class_id < 1)
+                                ? label_names[res.class_id]
+                                : "unknown";
+
+        // printf("  [%zu] %s: bbox=[%d,%d,%d,%d] conf=%.4f\n",
+        //        i, label, x1, y1, x2, y2, res.obj_prob);
+
+        cv::Scalar color(0, 255, 0);
+        cv::rectangle(img, cv::Point(x1, y1), cv::Point(x2, y2), color, 2);
+
+        char text[128];
+        snprintf(text, sizeof(text), "%s %.2f", label, res.obj_prob);
+        int baseline = 0;
+        cv::Size ts =
+            cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 0.6, 2, &baseline);
+        cv::rectangle(img,
+                      cv::Point(x1, y1 - ts.height - 10),
+                      cv::Point(x1 + ts.width, y1),
+                      color, -1);
+        cv::putText(img, text, cv::Point(x1, y1 - 5),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 2);
     }
 
-    std::vector<std::array<int, 4>> cls_dims = {
-        {1, 1, 40, 40}, {1, 1, 20, 20}, {1, 1, 10, 10}};
-    std::vector<std::array<int, 4>> box_dims = {
-        {1, 4, 40, 40}, {1, 4, 20, 20}, {1, 4, 10, 10}};
+    const char *output_path = "/home/orangepi/Code/ai_framework/source/output_rtmdet.jpg";
+    cv::imwrite(output_path, img);
+    // printf("  Result saved to: %s\n", output_path);
+    // cv::imshow("test", img);
+    // cv::waitKey(0);
 
-    RtmdetPostParams post_params;
-    post_params.input_width = 320;
-    post_params.input_height = 320;
-    post_params.strides = {8, 16, 32};
-    post_params.score_thr = 0.5f; // 与 Python 一致
-    post_params.nms_iou = 0.28f;  // 与 Python 一致
-
-    RtmdetPostProcess postprocess(post_params);
-    auto detections = postprocess.Run(output_fp32, cls_dims, box_dims);
-    printf("      detections: %zu\n", detections.size());
-
-    for (auto &d : detections)
-    {
-        float x1 = (d.x1 - pad_x) / scale, y1 = (d.y1 - pad_y) / scale;
-        float x2 = (d.x2 - pad_x) / scale, y2 = (d.y2 - pad_y) / scale;
-        x1 = std::max(0.0f, std::min(x1, static_cast<float>(img.cols - 1)));
-        y1 = std::max(0.0f, std::min(y1, static_cast<float>(img.rows - 1)));
-        x2 = std::max(0.0f, std::min(x2, static_cast<float>(img.cols - 1)));
-        y2 = std::max(0.0f, std::min(y2, static_cast<float>(img.rows - 1)));
-
-        cv::rectangle(img, cv::Point(x1, y1), cv::Point(x2, y2),
-                      cv::Scalar(0, 255, 0), 2);
-        char label[32];
-        std::snprintf(label, sizeof(label), "%.2f", d.score);
-        cv::putText(img, label, cv::Point(x1, y1 - 5),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
-        printf("  box=[%.1f,%.1f,%.1f,%.1f] score=%.4f\n", x1, y1, x2, y2, d.score);
-    }
-
-    const char *save_path = "/home/orangepi/Code/ai_framework/source/result.jpg";
-    cv::imwrite(save_path, img);
-    printf("\nDone! Saved → %s\n", save_path);
-
-    for (int i = 0; i < 6; ++i)
-        delete[] fp32_bufs[i];
     return 0;
 }

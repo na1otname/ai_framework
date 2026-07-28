@@ -5,6 +5,7 @@ target_include_directories(yolo_preprocess
 		${OpenCV_INCLUDE_DIRS}
 		${RGA_API_INCLUDE_PATH}
 		${CMAKE_CURRENT_SOURCE_DIR}
+
 )
 target_link_libraries(yolo_preprocess
 	PUBLIC
@@ -18,9 +19,11 @@ target_include_directories(yolo_postprocess
 		${OpenCV_INCLUDE_DIRS}
 		${RGA_API_INCLUDE_PATH}
 		${CMAKE_CURRENT_SOURCE_DIR}
+		engine
 )
 target_link_libraries(yolo_postprocess
 	PUBLIC
 		${RGA_API_LIB_PATH}
 		${OpenCV_LIBS}
+		engine
 )

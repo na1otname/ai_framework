@@ -92,8 +92,12 @@ namespace ai_framework
 
     const ModelFormat Engine::get_model_format() const
     {
-        // instance_ptr_->get_config().
         return instance_ptr_->get_config().model_format;
+    }
+
+    const Config &Engine::get_config() const
+    {
+        return instance_ptr_->get_config();
     }
 
     void Engine::DoInference(void)

@@ -216,8 +216,6 @@ bool Rk3588::QueryAndConfigureRuntime()
             shape.push_back(input_attr_[i].dims[d]);
         config_.input_layer_shape[name] = shape;
 
-        config_.scale[name] = input_attr_[i].scale;
-        config_.zero_point[name] = input_attr_[i].zp;
         config_.tensor_size[name] = input_attr_[i].n_elems * input_attr_[i].w_stride;
         config_.width_equal_stride[name] = (input_attr_[i].w_stride == (uint32_t)input_attr_[i].dims[2]);
         config_.stride[name] = input_attr_[i].w_stride;
@@ -240,8 +238,13 @@ bool Rk3588::QueryAndConfigureRuntime()
             shape.push_back(output_attr_[i].dims[d]);
         config_.output_layer_shape[name] = shape;
 
-        config_.scale[name] = output_attr_[i].scale;
-        config_.zero_point[name] = output_attr_[i].zp;
+        if ((output_attr_[i].type == RKNN_TENSOR_INT8 ||
+             output_attr_[i].type == RKNN_TENSOR_UINT8) &&
+            (output_attr_[i].qnt_type != RKNN_TENSOR_QNT_NONE))
+        {
+            config_.scale[name] = output_attr_[i].scale;
+            config_.zero_point[name] = output_attr_[i].zp;
+        }
         config_.tensor_size[name] = output_attr_[i].n_elems * output_attr_[i].w_stride;
 
         config_.output_fmt_str[name] = get_format_string(output_attr_[i].fmt);
