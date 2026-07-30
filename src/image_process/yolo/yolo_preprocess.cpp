@@ -39,19 +39,18 @@ void YoloPreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
             RK_FORMAT_RGB_888);
         imresize(src_rga, cvt_rga);
 
-        // Step 2: 计算边框并填充为正方形，填充色 RGB(114,114,114)
+        // Step 2: 填充为正方形，左上角对齐（匹配 Python letter_box: 仅右下填充）
+        // 填充色 RGB(114,114,114)
         int border_left = 0, border_right = 0, border_top = 0, border_bottom = 0;
         if (resize_height > resize_width)
         {
-            int delta = resize_height - resize_width;
-            border_left = delta >> 1;
-            border_right = delta - border_left;
+            // 高度大于宽度：右侧填充
+            border_right = resize_height - resize_width;
         }
         else if (resize_width > resize_height)
         {
-            int delta = resize_width - resize_height;
-            border_top = delta >> 1;
-            border_bottom = delta - border_top;
+            // 宽度大于高度：底部填充
+            border_bottom = resize_width - resize_height;
         }
 
         rga_buffer_t out_rga = wrapbuffer_virtualaddr(
@@ -98,15 +97,13 @@ void YoloPreProcess::MakeSquare(const cv::Mat &src, cv::Mat &dst)
 
     if (height > width)
     {
-        int delta = height - width;
-        border_left += (delta >> 1);
-        border_right = border_left;
+        // 左上角对齐：右侧填充
+        border_right = height - width;
     }
     else
     {
-        int delta = width - height;
-        border_top += (delta >> 1);
-        border_bottom = border_top;
+        // 左上角对齐：底部填充
+        border_bottom = width - height;
     }
     // 使用灰色(114,114,114)填充边缘
     cv::copyMakeBorder(src, dst, border_top, border_bottom, border_left,

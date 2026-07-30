@@ -82,7 +82,7 @@ int main()
     std::vector<float> conf_threshold = {0.5f};
     float sum_conf_threshold = 0.5f;
 
-    PostProcess postprocess(config, conf_threshold, sum_conf_threshold, 0.5f);
+    PostProcess postprocess(config, conf_threshold, sum_conf_threshold, 0.25f);
 
     // 构建 output tensors（const_cast 仅用于 PostProcess 读取）
     int output_count = engine.get_output_tensor_count();

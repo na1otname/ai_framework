@@ -440,7 +440,6 @@ void PostProcess::PostProcessDetectSegment(void **&tensors)
     }
 }
 
-
 void PostProcess::PostProcessRtmdet(void **&tensors)
 {
     int validCount = 0;
@@ -595,145 +594,98 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
     const uint16_t *box_tensor_fp16 = reinterpret_cast<const uint16_t *>(box_tensor);
     const uint16_t *score_tensor_fp16 = reinterpret_cast<const uint16_t *>(score_tensor);
     bool is_qnt = zero_points_.empty() ? false : true;
-
-    // fp16 模型 zp=0, scale=1 是占位值，不是真正的量化
-    if (is_qnt)
-    {
-        bool all_placeholder = true;
-        for (size_t s = 0; s < scale_.size(); ++s)
-        {
-            if (std::abs(scale_[s] - 1.0f) > 1e-6f || zero_points_[s] != 0)
-            {
-                all_placeholder = false;
-                break;
-            }
-        }
-        if (all_placeholder)
-        {
-            is_qnt = false;
-        }
-    }
-
+    int8_t score_thres_i8 =
+        is_qnt ? qnt_f32_to_affine(sum_conf_threshold_,
+                                   zero_points_.at(index * output_per_branch + 1),
+                                   scale_.at(index * output_per_branch + 1))
+               : 0;
     uint16_t valid_count = 0;
     int grid_len = grid_w * grid_h;
-
-    // RTMDet: 前半部分 outputs 是分类置信度 scores，后半部分是 bbox 预测
-    int cls_layers = output_per_branch;
-    int bbox_zp_idx = index + cls_layers;
-
     for (int i = 0; i < grid_h; ++i)
     {
         for (int j = 0; j < grid_w; ++j)
         {
             int offset = i * grid_w + j;
-            float max_score_float = 0;
-            int max_class_id = -1;
 
-            // 1. 处理分类得分 (包含 Sigmoid 激活)
-            for (size_t k = 0; k < conf_threshold_->size(); ++k)
+            if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                model_format_ == ModelFormat::TRT_FORMAT ||
+                model_format_ == ModelFormat::NNRT_FORMAT)
             {
-                float raw_score = 0.0f;
-
-                if (model_format_ == ModelFormat::ONNX_FORMAT ||
-                    model_format_ == ModelFormat::TRT_FORMAT ||
-                    model_format_ == ModelFormat::NNRT_FORMAT)
+                if (score_tensor_float[offset] < sum_conf_threshold_)
+                    continue;
+            }
+            else if (model_format_ == ModelFormat::RKNN_FORMAT)
+            {
+                if (is_qnt)
                 {
-                    raw_score = score_tensor_float[offset];
+                    if (score_tensor_int8[offset] < score_thres_i8)
+                        continue;
                 }
-                else if (model_format_ == ModelFormat::RKNN_FORMAT)
+                else
                 {
-                    if (is_qnt)
-                    {
-                        // int8 量化 → 反量化
-                        raw_score = deqnt_affine_to_f32(score_tensor_int8[offset],
-                                                        zero_points_.at(index),
-                                                        scale_.at(index));
-                    }
-                    else
-                    {
-                        // fp16 非量化 → 直接转换
-                        raw_score = fp16_to_f32(score_tensor_fp16[offset]);
-                    }
+                    if (score_tensor_fp16[offset] < sum_conf_threshold_)
+                        continue;
                 }
-
-                // RTMDet 对 raw score 进行 sigmoid 操作
-                float score = 1.0f / (1.0f + std::exp(-raw_score));
-
-                if (score >= conf_threshold_->at(k) && score > max_score_float)
-                {
-                    max_score_float = score;
-                    max_class_id = k;
-                }
-
-                offset += grid_len;
             }
 
-            // 2. 边界框解码 (对应 Python 中的 decoded_bbox 逻辑)
-            if (max_class_id != -1)
+            float max_score_float = 0;
+            int8_t max_score_int8 = is_qnt ? qnt_f32_to_affine(0.0f, zero_points_.at(index * output_per_branch + 1),
+                                                               scale_.at(index * output_per_branch + 1))
+                                           : 0;
+            int max_class_id = -1;
+            for (size_t k = 0; k < conf_threshold_->size(); ++k)
             {
-                offset = i * grid_w + j;
-                float l, r, t, b_val;
-
                 if (model_format_ == ModelFormat::ONNX_FORMAT ||
                     model_format_ == ModelFormat::TRT_FORMAT ||
                     model_format_ == ModelFormat::NNRT_FORMAT)
                 {
-                    l = box_tensor_float[offset + 0 * grid_len];
-                    r = box_tensor_float[offset + 1 * grid_len];
-                    t = box_tensor_float[offset + 2 * grid_len];
-                    b_val = box_tensor_float[offset + 3 * grid_len];
+                    if (score_tensor_float[offset] > conf_threshold_->at(k) && score_tensor_float[offset] > max_score_float)
+                    {
+                        max_score_float = score_tensor_float[offset];
+                        max_class_id = k;
+                    }
                 }
                 else if (model_format_ == ModelFormat::RKNN_FORMAT)
                 {
-                    if (is_qnt)
+                    auto score_thres_i8 = is_qnt ? qnt_f32_to_affine(conf_threshold_->at(k),
+                                                                     zero_points_.at(index * output_per_branch + 1),
+                                                                     scale_.at(index * output_per_branch + 1))
+                                                 : 0;
+                    if (score_tensor_int8[offset] > score_thres_i8 && score_tensor_int8[offset] > max_score_float)
                     {
-                        l = deqnt_affine_to_f32(box_tensor_int8[offset + 0 * grid_len],
-                                                zero_points_.at(bbox_zp_idx),
-                                                scale_.at(bbox_zp_idx));
-                        r = deqnt_affine_to_f32(box_tensor_int8[offset + 1 * grid_len],
-                                                zero_points_.at(bbox_zp_idx),
-                                                scale_.at(bbox_zp_idx));
-                        t = deqnt_affine_to_f32(box_tensor_int8[offset + 2 * grid_len],
-                                                zero_points_.at(bbox_zp_idx),
-                                                scale_.at(bbox_zp_idx));
-                        b_val = deqnt_affine_to_f32(box_tensor_int8[offset + 3 * grid_len],
-                                                    zero_points_.at(bbox_zp_idx),
-                                                    scale_.at(bbox_zp_idx));
-                    }
-                    else
-                    {
-                        l = fp16_to_f32(box_tensor_fp16[offset + 0 * grid_len]);
-                        r = fp16_to_f32(box_tensor_fp16[offset + 1 * grid_len]);
-                        t = fp16_to_f32(box_tensor_fp16[offset + 2 * grid_len]);
-                        b_val = fp16_to_f32(box_tensor_fp16[offset + 3 * grid_len]);
+                        max_score_int8 = score_tensor_int8[offset];
+                        max_class_id = k;
                     }
                 }
-
-                // 核心对齐：配合 Python 代码 get_multi_level_priors (offset=0)
-                // priors 使用格点左上角坐标 (j*stride, i*stride)，非中心点
-                float cx = j * stride;
-                float cy = i * stride;
-
-                Bbox _bbox;
-                _bbox.x1 = cx - l;
-                _bbox.y1 = cy - t;
-                _bbox.x2 = cx + r;
-                _bbox.y2 = cy + b_val;
-
-                // 过滤异常框
-                if (std::abs(_bbox.x1 - _bbox.x2) < 1 || std::abs(_bbox.y1 - _bbox.y2) < 1)
+                offset += grid_len;
+            }
+            if (max_class_id != -1)
+            {
+                offset += i * grid_w + j;
+                float box[4];
+                float _ltrb[dfl_len_ * 4];
+                for (int k = 0; k < dfl_len_ * 4; ++k)
                 {
-                    continue;
+                    if (model_format_ == ModelFormat::ONNX_FORMAT ||
+                        model_format_ == ModelFormat::TRT_FORMAT ||
+                        model_format_ == ModelFormat::NNRT_FORMAT)
+                    {
+                        _ltrb[k] = box_tensor_float[offset];
+                    }
+                    else if (model_format_ == ModelFormat::RKNN_FORMAT)
+                    {
+                        _ltrb[k] = is_qnt ? deqnt_affine_to_f32(box_tensor_int8[offset],
+                                                                zero_points_.at(index * output_per_branch),
+                                                                scale_.at(index * output_per_branch))
+                                          : 0;
+                    }
+                    offset += grid_len;
                 }
-
-                bboxes_.push_back(_bbox);
-                class_id_.push_back(max_class_id);
-                obj_probs_.push_back(max_score_float);
-                bboxes_idx_.push_back({index, i * grid_w + j, grid_len});
-                valid_count++;
+                Bbox _bbox;
             }
         }
     }
+
     return valid_count;
 }
 
