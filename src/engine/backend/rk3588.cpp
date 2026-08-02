@@ -1,7 +1,21 @@
 #include "rk3588.h"
 #include <cstring>
+#include <cstdlib>
 
 const int RK3588_CORE_NUM = 3;
+
+// 分配 64 字节对齐的 CPU 缓冲。
+// 非零拷贝模式下输入 buffer 会传给 RGA importbuffer_virtualaddr（要求虚拟地址
+// 64 字节对齐），普通 malloc 只保证 16 字节对齐会导致 RGA 导入失败。
+static void *aligned_alloc_buf(size_t size)
+{
+    if (size == 0)
+        return nullptr;
+    void *ptr = nullptr;
+    if (posix_memalign(&ptr, 64, size) != 0)
+        return nullptr;
+    return ptr;
+}
 
 // 线程安全的核心轮询分配
 int get_core_num()
@@ -24,11 +38,23 @@ Rk3588::~Rk3588()
 {
     if (input_)
     {
+        // 释放每个输入 tensor 的 CPU 缓冲（非零拷贝模式分配）
+        for (size_t i = 0; i < config_.input_tensors_count; ++i)
+        {
+            if (input_[i].buf)
+                free(input_[i].buf);
+        }
         free(input_);
         input_ = nullptr;
     }
     if (output_)
     {
+        // 释放每个输出 tensor 的 CPU 缓冲（非零拷贝模式分配）
+        for (size_t i = 0; i < config_.output_tensors_count; ++i)
+        {
+            if (output_[i].buf)
+                free(output_[i].buf);
+        }
         free(output_);
         output_ = nullptr;
     }
@@ -169,7 +195,10 @@ bool Rk3588::QueryAndConfigureRuntime()
     {
         input_attr_[i].index = i;
 
-        ret = rknn_query(ctx_, RKNN_QUERY_INPUT_ATTR, &input_attr_[i], sizeof(rknn_tensor_attr));
+        ret = zero_copy_ ? rknn_query(ctx_, RKNN_QUERY_NATIVE_INPUT_ATTR, &input_attr_[i], sizeof(rknn_tensor_attr))
+                         : rknn_query(ctx_, RKNN_QUERY_INPUT_ATTR, &input_attr_[i], sizeof(rknn_tensor_attr));
+
+        input_attr_[i].type = input_type_; // 强制覆盖输入类型，避免模型输入类型不一致导致的推理失败
 
         if (ret != RKNN_SUCC)
         {
@@ -185,7 +214,8 @@ bool Rk3588::QueryAndConfigureRuntime()
     {
         output_attr_[i].index = i;
 
-        ret = rknn_query(ctx_, RKNN_QUERY_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr));
+        ret = zero_copy_ ? rknn_query(ctx_, RKNN_QUERY_NATIVE_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr))
+                         : rknn_query(ctx_, RKNN_QUERY_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr));
 
         if (ret != RKNN_SUCC)
         {
@@ -221,7 +251,7 @@ bool Rk3588::QueryAndConfigureRuntime()
         config_.stride[name] = input_attr_[i].w_stride;
 
         config_.input_fmt_str[name] = get_format_string(input_attr_[i].fmt);
-        config_.input_type_str[name] = get_type_string(input_attr_[i].type);
+        config_.input_type_str[name] = get_type_string(input_type_);
         config_.input_qnt_type_str[name] = get_qnt_type_string(input_attr_[i].qnt_type);
     }
 
@@ -259,28 +289,23 @@ bool Rk3588::QueryAndConfigureRuntime()
 void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
 {
 
-    // if (zero_copy_)
+    if (zero_copy_)
     {
         auto **input_mem = tensor_data.get_input_rknn_tensor_mem_ptr();
         auto **output_mem = tensor_data.get_output_rknn_tensor_mem_ptr();
 
-        rknn_tensor_attr input_nativate_attrs[config_.input_tensors_count];
-        memset(input_nativate_attrs, 0, sizeof(input_nativate_attrs));
-
         for (uint32_t i = 0; i < tensor_data.get_input_tensor_count(); ++i)
         {
-            input_nativate_attrs[i].index = i;
-            int ret = rknn_query(ctx_, RKNN_QUERY_NATIVE_INPUT_ATTR, &(input_nativate_attrs[i]), sizeof(rknn_tensor_attr));
 
             // 分配零拷贝输入内存
-            input_mem[i] = rknn_create_mem(ctx_, input_nativate_attrs[i].size_with_stride);
+            input_mem[i] = rknn_create_mem(ctx_, input_attr_[i].size_with_stride);
             if (input_mem[i] == nullptr)
             {
-                LOG_ERROR("rknn_create_mem(input[{}], size={}) failed!", i, input_nativate_attrs[i].size_with_stride);
+                LOG_ERROR("rknn_create_mem(input[{}], size={}) failed!", i, input_attr_[i].size_with_stride);
                 continue;
             }
 
-            ret = rknn_set_io_mem(ctx_, input_mem[i], &input_nativate_attrs[i]);
+            int ret = rknn_set_io_mem(ctx_, input_mem[i], &input_attr_[i]);
 
             if (ret < 0)
             {
@@ -292,84 +317,92 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
                      i,
                      input_mem[i]->virt_addr,
                      input_mem[i]->fd,
-                     input_nativate_attrs[i].size_with_stride,
-                     input_nativate_attrs[i].fmt);
+                     input_attr_[i].size_with_stride,
+                     input_attr_[i].fmt);
 
             // 将 DMA buffer 地址暴露给外部，统一通过 get_input_tensor_ptr() 写入数据
             tensor_data.get_input_tensor_ptr()[i] = input_mem[i]->virt_addr;
         }
 
-        rknn_tensor_attr output_nativate_attrs[config_.output_tensors_count];
-        memset(output_nativate_attrs, 0, sizeof(output_nativate_attrs));
-
         for (uint32_t i = 0; i < tensor_data.get_output_tensor_count(); ++i)
         {
-            output_nativate_attrs[i].index = i;
-            int ret = rknn_query(ctx_, RKNN_QUERY_NATIVE_OUTPUT_ATTR, &(output_nativate_attrs[i]), sizeof(rknn_tensor_attr));
 
             // 分配零拷贝输出内存
-            output_mem[i] = rknn_create_mem(ctx_, output_nativate_attrs[i].size_with_stride);
+            output_mem[i] = rknn_create_mem(ctx_, output_attr_[i].size_with_stride);
             if (output_mem[i] == nullptr)
             {
-                LOG_ERROR("rknn_create_mem(output[{}], size={}) failed!", i, output_nativate_attrs[i].size_with_stride);
+                LOG_ERROR("rknn_create_mem(output[{}], size={}) failed!", i, output_attr_[i].size_with_stride);
                 continue;
             }
-            ret = rknn_set_io_mem(ctx_, output_mem[i], &output_nativate_attrs[i]);
+            int ret = rknn_set_io_mem(ctx_, output_mem[i], &output_attr_[i]);
             if (ret < 0)
             {
                 LOG_ERROR("rknn_set_io_mem(output[{}]) fail! ret={}", i, ret);
                 continue;
             }
-            LOG_INFO("zero-copy output mem[{}]: virt={} fd={} size={} fmt={}",
+            LOG_INFO("zero-copy output mem[{}]: virt={} fd={} size={} fmt={} ",
                      i,
                      output_mem[i]->virt_addr,
                      output_mem[i]->fd,
-                     output_nativate_attrs[i].size_with_stride,
-                     output_nativate_attrs[i].fmt);
+                     output_attr_[i].size_with_stride,
+                     output_attr_[i].fmt);
 
             // 将 DMA buffer 地址暴露给外部，统一通过 get_output_tensor_ptr() 读取结果
             tensor_data.get_output_tensor_ptr()[i] = output_mem[i]->virt_addr;
         }
     }
-    // else
-    // {
-    //     input_ = (rknn_input *)malloc(config_.input_tensors_count * sizeof(rknn_input));
-    //     memset(input_, 0, config_.input_tensors_count * sizeof(rknn_input));
+    else
+    {
+        input_ = (rknn_input *)malloc(config_.input_tensors_count * sizeof(rknn_input));
+        memset(input_, 0, config_.input_tensors_count * sizeof(rknn_input));
 
-    //     output_ = (rknn_output *)malloc(config_.output_tensors_count * sizeof(rknn_output));
-    //     memset(output_, 0, config_.output_tensors_count * sizeof(rknn_output));
+        output_ = (rknn_output *)malloc(config_.output_tensors_count * sizeof(rknn_output));
+        memset(output_, 0, config_.output_tensors_count * sizeof(rknn_output));
 
-    //     for (size_t i = 0; i < config_.input_tensors_count; ++i)
-    //     {
-    //         input_[i].index = i;
-    //         input_[i].type = input_attr_[i].type;
-    //         input_[i].fmt = input_attr_[i].fmt;
-    //         input_[i].size = input_attr_[i].size;
+        for (size_t i = 0; i < config_.input_tensors_count; ++i)
+        {
+            input_[i].index = i;
+            input_[i].type = input_type_;
+            input_[i].fmt = input_attr_[i].fmt;
+            input_[i].size = input_attr_[i].size;
 
-    //         void *buffer = malloc(input_attr_[i].size);
-    //         if (buffer == nullptr)
-    //         {
-    //             LOG_ERROR("malloc CPU buffer failed for input tensor [{}] size={}", i, input_attr_[i].size);
-    //             continue;
-    //         }
-    //         memset(buffer, 0, input_attr_[i].size);
-    //         input_[i].buf = buffer;
-    //         tensor_data.get_input_tensor_ptr()[i] = buffer;
-    //     }
+            void *buffer = malloc(input_attr_[i].size);
+            if (buffer == nullptr)
+            {
+                LOG_ERROR("malloc CPU buffer failed for input tensor [{}] size={}", i, input_attr_[i].size);
+                continue;
+            }
+            memset(buffer, 0, input_attr_[i].size);
+            input_[i].buf = buffer;
+            // 暴露实际 CPU buffer 地址（而非 &input_[i].buf），预处理直接写入该 buffer，
+            // 之后 rknn_inputs_set 使用同一块内存，避免覆盖指针变量造成堆破坏。
+            tensor_data.get_input_tensor_ptr()[i] = buffer;
+        }
 
-    //     for (size_t i = 0; i < config_.output_tensors_count; ++i)
-    //     {
-    //         output_[i].index = i;
-    //         tensor_data.get_output_tensor_ptr()[i] = output_[i].buf;
-    //     }
+        for (size_t i = 0; i < config_.output_tensors_count; ++i)
+        {
+            output_[i].index = i;
+            output_[i].want_float = 0;  // 保持原始量化类型（int8/uint8/fp16），后处理自行反量化
+            output_[i].is_prealloc = 1; // 预分配缓冲，rknn_outputs_get 直接写入，指针稳定
 
-    //     // tensor_data.get_input_tensor_ptr() = input_->buf();
-    // }
+            void *buffer = malloc(output_attr_[i].size);
+            if (buffer == nullptr)
+            {
+                LOG_ERROR("malloc CPU buffer failed for output tensor [{}] size={}", i, output_attr_[i].size);
+                continue;
+            }
+            memset(buffer, 0, output_attr_[i].size);
+            output_[i].buf = buffer;
+            output_[i].size = output_attr_[i].size;
+            // 暴露实际输出缓冲地址（而非 &output_[i].buf），后处理直接读取该 buffer。
+            tensor_data.get_output_tensor_ptr()[i] = buffer;
+        }
+    }
 }
 
 void Rk3588::DoInference()
 {
-    // if (zero_copy_)
+    if (zero_copy_)
     {
         int ret = rknn_run(ctx_, nullptr);
         if (ret < 0)
@@ -378,20 +411,28 @@ void Rk3588::DoInference()
             return;
         }
     }
-    // else
-    // {
-    //     int ret = rknn_inputs_set(ctx_, config_.input_tensors_count, input_);
-    //     ret = rknn_run(ctx_, nullptr);
-    //     if (ret < 0)
-    //     {
-    //         LOG_ERROR("rknn_run fail! ret={}", ret);
-    //     }
-    //     // 4. 获取推理输出结果
-    //     ret = rknn_outputs_get(ctx_, config_.output_tensors_count, output_, nullptr);
-    //     if (ret < 0)
-    //     {
-    //         LOG_ERROR("rknn_outputs_get failed! ret={}", ret);
-    //         return;
-    //     }
-    // }
+    else
+    {
+        // 1. 上传输入数据（input_ 的 buf 由 BindInputAndOutput 预分配，与预处理写入的地址一致）
+        int ret = rknn_inputs_set(ctx_, config_.input_tensors_count, input_);
+        if (ret < 0)
+        {
+            LOG_ERROR("rknn_inputs_set fail! ret={}", ret);
+            return;
+        }
+        // 2. 执行推理
+        ret = rknn_run(ctx_, nullptr);
+        if (ret < 0)
+        {
+            LOG_ERROR("rknn_run fail! ret={}", ret);
+            return;
+        }
+        // 3. 获取推理输出结果（is_prealloc=1，写入预分配缓冲，后处理直接读取）
+        ret = rknn_outputs_get(ctx_, config_.output_tensors_count, output_, nullptr);
+        if (ret < 0)
+        {
+            LOG_ERROR("rknn_outputs_get failed! ret={}", ret);
+            return;
+        }
+    }
 }

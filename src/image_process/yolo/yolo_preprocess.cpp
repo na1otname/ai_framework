@@ -1,8 +1,12 @@
 #include "yolo_preprocess.h"
 
 #ifdef RK3588
-#include "im2d.hpp"
+#include <cstdlib>
+#include <cstring>
+#include <memory>
 #include <vector>
+
+#include "im2d.hpp"
 #endif
 
 YoloPreProcess::YoloPreProcess(int target_side_length, bool debug)
@@ -26,40 +30,54 @@ void YoloPreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
             resize_width = original_input.cols / scale;
         }
 #ifdef RK3588
-        // 使用 RGA 硬件加速预处理：resize + BGR2RGB + padding
-        // Step 1: RGA resize（同时做 BGR→RGB 格式转换）
-        std::vector<uint8_t> cvt_buf(resize_width * resize_height * 3);
-        rga_buffer_t src_rga = wrapbuffer_virtualaddr(
+        // RGA3 版本：imfill 填充背景 114（RGB 灰），improcess 一次性完成
+        // resize + BGR→RGB + 写入左上角区域。全程走 RGA3（有 IOMMU，支持
+        // 用户态虚拟地址）；makeBorder 仅 RGA2 支持、且 RGA2 无 IOMMU，故不用。
+        const size_t out_size =
+            (size_t)target_side_length_ * target_side_length_ * 3;
+        rga_buffer_handle_t src_handle = importbuffer_virtualaddr(
             (void *)original_input.data,
-            original_input.cols, original_input.rows,
+            (int)(original_input.step * original_input.rows));
+        rga_buffer_handle_t out_handle =
+            importbuffer_virtualaddr(tensors[i], (int)out_size);
+        if (!src_handle || !out_handle)
+        {
+            fprintf(stderr,
+                    "[PreProcess] importbuffer_virtualaddr failed (src=%d "
+                    "out=%d) tensors[%zu]=%p out_size=%zu src_size=%d\n",
+                    (int)src_handle, (int)out_handle, i, tensors[i], out_size,
+                    (int)(original_input.step * original_input.rows));
+            return;
+        }
+        rga_buffer_t src_rga = wrapbuffer_handle(
+            src_handle, original_input.cols, original_input.rows,
             RK_FORMAT_BGR_888);
-        rga_buffer_t cvt_rga = wrapbuffer_virtualaddr(
-            cvt_buf.data(),
-            resize_width, resize_height,
+        rga_buffer_t out_rga = wrapbuffer_handle(
+            out_handle, target_side_length_, target_side_length_,
             RK_FORMAT_RGB_888);
-        imresize(src_rga, cvt_rga);
 
-        // Step 2: 填充为正方形，左上角对齐（匹配 Python letter_box: 仅右下填充）
-        // 填充色 RGB(114,114,114)
-        int border_left = 0, border_right = 0, border_top = 0, border_bottom = 0;
-        if (resize_height > resize_width)
-        {
-            // 高度大于宽度：右侧填充
-            border_right = resize_height - resize_width;
-        }
-        else if (resize_width > resize_height)
-        {
-            // 宽度大于高度：底部填充
-            border_bottom = resize_width - resize_height;
-        }
+        // Step 1: 背景填充 RGB(114,114,114)
+        // 注意：imfill 底层走 RGA_COLORFILL 旧接口，在 RGA3 上不支持
+        // （RGA_COLORFILL fail: Invalid argument），故背景用 CPU memset
+        // 填充（307KB，开销可忽略），缩放仍由 RGA3 improcess 完成。
+        memset(tensors[i], 114, out_size);
 
-        rga_buffer_t out_rga = wrapbuffer_virtualaddr(
-            tensors[i],
-            target_side_length_, target_side_length_,
-            RK_FORMAT_RGB_888);
-        immakeBorder(cvt_rga, out_rga,
-                     border_top, border_bottom, border_left, border_right,
-                     IM_BORDER_CONSTANT, 0x727272);
+        // Step 2: 把原图（保持宽高比）缩放到左上角区域，同时 BGR→RGB。
+        // improcess 只更新 drect 区域，其余保持 Step 1 的背景色。
+        im_opt_t opt = {};
+        opt.core = IM_SCHEDULER_RGA3_CORE0; // 强制走 RGA3
+        im_rect srect = {0, 0, original_input.cols, original_input.rows};
+        im_rect drect = {0, 0, resize_width, resize_height};
+        IM_STATUS st_proc = improcess(src_rga, out_rga, rga_buffer_t(), srect,
+                                      drect, im_rect(), -1, nullptr, &opt, 0);
+        if (st_proc != IM_STATUS_SUCCESS)
+        {
+            fprintf(stderr, "[PreProcess] improcess failed, status=%d\n",
+                    (int)st_proc);
+            return;
+        }
+        releasebuffer_handle(src_handle);
+        releasebuffer_handle(out_handle);
 
         if (debug_)
         {

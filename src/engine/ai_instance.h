@@ -71,7 +71,7 @@ namespace ai_framework
         Engine() = delete;
         Engine(const enum ModelFormat format, const char *model_path);
         void **&get_input_tensor_ptr();
-        const void *const *get_output_tensor_ptr();
+        void **&get_output_tensor_ptr();
         const int get_input_tensor_count();
         const int get_output_tensor_count();
         const std::map<std::string, std::vector<int64_t>> &get_input_tensor_shape()

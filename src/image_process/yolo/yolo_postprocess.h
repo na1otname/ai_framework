@@ -2,6 +2,8 @@
 #include "ai_instance.h"
 #include "opencv2/opencv.hpp"
 #include "stdint.h"
+#include <cmath>
+#include <type_traits>
 
 using ai_framework::ModelFormat;
 

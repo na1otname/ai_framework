@@ -196,6 +196,7 @@ namespace ai_framework
             int64_t d1 = shape.size() > 1 ? shape[1] : 0;
             int64_t d2 = shape.size() > 2 ? shape[2] : 0;
             int64_t d3 = shape.size() > 3 ? shape[3] : 0;
+            int64_t d4 = shape.size() > 4 ? shape[4] : 0; // 如果输出是5维，获取第5维，否则为0
 
             // 格式化输出所有属性
             // 注意：fmt, type, qnt_type 在 Config 中暂无对应字段，当前使用 "N/A" 占位
@@ -203,11 +204,11 @@ namespace ai_framework
             auto output_zp_it = config_.zero_point.find(name);
             std::string output_zp_str = (output_zp_it != config_.zero_point.end()) ? std::to_string(output_zp_it->second) : "N/A";
             std::string output_scale_str = (output_scale_it != config_.scale.end()) ? std::to_string(output_scale_it->second) : "N/A";
-            LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
+            LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
                      i,
                      name.c_str(),
                      shape.size(),
-                     d0, d1, d2, d3,
+                     d0, d1, d2, d3, d4,
                      config_.output_element_count[name],
                      config_.tensor_size[name],
                      config_.output_fmt_str[name], config_.output_type_str[name], config_.output_qnt_type_str[name],

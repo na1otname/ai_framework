@@ -1,5 +1,6 @@
 #include "yolo_postprocess.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <set>
@@ -27,6 +28,13 @@ static int8_t qnt_f32_to_affine(float f32, int32_t zp, float scale)
 }
 
 static float deqnt_affine_to_f32(int8_t qnt, int32_t zp, float scale)
+{
+    return ((float)qnt - (float)zp) * scale;
+}
+
+// RKNN 非对称量化：zp>0 的层（如 RTMDet 的 score/cls 层）实际以 uint8 存储，
+// 必须按 (u8 - zp) × scale 反量化，否则高分字节会被误读成负数 int8。
+static float deqnt_affine_u8_to_f32(uint8_t qnt, int32_t zp, float scale)
 {
     return ((float)qnt - (float)zp) * scale;
 }
@@ -77,6 +85,12 @@ static float fp16_to_f32(uint16_t half)
     return result;
 }
 
+template <typename T>
+static T sigmoid(T x)
+{
+    return static_cast<T>(1) / (static_cast<T>(1) + std::exp(-x));
+}
+
 PostProcess::PostProcess(const ai_framework::Config &config,
                          std::vector<float> &conf_threshold,
                          float sum_conf_threshold,
@@ -103,10 +117,26 @@ PostProcess::PostProcess(const ai_framework::Config &config,
     }
     conf_threshold_ = &conf_threshold;
     sum_conf_threshold_ = sum_conf_threshold;
-    auto input_shape =
-        config.input_layer_shape.at(config.input_index_to_name.at(0));
-    model_width_ = input_shape.at(3);
-    model_height_ = input_shape.at(2);
+    auto input_name = config.input_index_to_name.at(0);
+    auto input_shape = config.input_layer_shape.at(input_name);
+    // 输入可能是 NHWC (1,H,W,3) 或 NCHW (1,3,H,W)，按实际 fmt 取 H/W
+    bool input_nhwc = false;
+    auto fmt_it = config.input_fmt_str.find(input_name);
+    if (fmt_it != config.input_fmt_str.end() &&
+        fmt_it->second.find("NHWC") != std::string::npos)
+    {
+        input_nhwc = true;
+    }
+    if (input_nhwc)
+    {
+        model_height_ = input_shape.at(1);
+        model_width_ = input_shape.at(2);
+    }
+    else
+    {
+        model_width_ = input_shape.at(3);
+        model_height_ = input_shape.at(2);
+    }
     auto output_boxes_shape =
         config.output_layer_shape.at(config.output_index_to_name.at(0));
     dfl_len_ = output_boxes_shape.at(1) / 4;
@@ -473,14 +503,7 @@ void PostProcess::PostProcessRtmdet(void **&tensors)
         indexArray.push_back(i);
     }
     quick_sort_indice_inverse(obj_probs_, 0, validCount - 1, indexArray);
-
-    // Per-class NMS
-    std::set<int> class_set(std::begin(class_id_), std::end(class_id_));
-    for (auto c : class_set)
-    {
-        nms(validCount, bboxes_, class_id_, indexArray, c, iou_threshold_);
-    }
-
+    nms(validCount, bboxes_, indexArray, iou_threshold_);
     for (int i = 0; i < validCount; ++i)
     {
         if (indexArray[i] == -1)
@@ -492,7 +515,8 @@ void PostProcess::PostProcessRtmdet(void **&tensors)
         res.model_type = ModelType::DETECTION_RTMDE;
         res.box = bboxes_.at(n);
         res.class_id = class_id_.at(n);
-        res.obj_prob = obj_probs_.at(i);
+        res.obj_prob = obj_probs_.at(n);
+
         result_.push_back(res);
     }
 }
@@ -587,101 +611,106 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                                     const void *sum_score_tensor, int grid_w, int grid_h,
                                     int stride, int index, int output_per_branch)
 {
+    // RTMDet: score 层索引 = index，box 层索引 = index + output_per_branch
     const float *box_tensor_float = reinterpret_cast<const float *>(box_tensor);
     const float *score_tensor_float = reinterpret_cast<const float *>(score_tensor);
     const int8_t *box_tensor_int8 = reinterpret_cast<const int8_t *>(box_tensor);
     const int8_t *score_tensor_int8 = reinterpret_cast<const int8_t *>(score_tensor);
-    const uint16_t *box_tensor_fp16 = reinterpret_cast<const uint16_t *>(box_tensor);
-    const uint16_t *score_tensor_fp16 = reinterpret_cast<const uint16_t *>(score_tensor);
+
     bool is_qnt = zero_points_.empty() ? false : true;
-    int8_t score_thres_i8 =
-        is_qnt ? qnt_f32_to_affine(sum_conf_threshold_,
-                                   zero_points_.at(index * output_per_branch + 1),
-                                   scale_.at(index * output_per_branch + 1))
-               : 0;
+    const float score_zp = is_qnt ? zero_points_.at(index) : 0.f;
+    const float score_scale = is_qnt ? scale_.at(index) : 1.f;
+    const float box_zp =
+        is_qnt ? zero_points_.at(index + output_per_branch) : 0.f;
+    const float box_scale =
+        is_qnt ? scale_.at(index + output_per_branch) : 1.f;
+    const size_t num_classes = conf_threshold_->size();
+
     uint16_t valid_count = 0;
     int grid_len = grid_w * grid_h;
+
     for (int i = 0; i < grid_h; ++i)
     {
         for (int j = 0; j < grid_w; ++j)
         {
             int offset = i * grid_w + j;
 
-            if (model_format_ == ModelFormat::ONNX_FORMAT ||
-                model_format_ == ModelFormat::TRT_FORMAT ||
-                model_format_ == ModelFormat::NNRT_FORMAT)
-            {
-                if (score_tensor_float[offset] < sum_conf_threshold_)
-                    continue;
-            }
-            else if (model_format_ == ModelFormat::RKNN_FORMAT)
-            {
-                if (is_qnt)
-                {
-                    if (score_tensor_int8[offset] < score_thres_i8)
-                        continue;
-                }
-                else
-                {
-                    if (score_tensor_fp16[offset] < sum_conf_threshold_)
-                        continue;
-                }
-            }
-
-            float max_score_float = 0;
-            int8_t max_score_int8 = is_qnt ? qnt_f32_to_affine(0.0f, zero_points_.at(index * output_per_branch + 1),
-                                                               scale_.at(index * output_per_branch + 1))
-                                           : 0;
+            // 逐类读 logits（NCHW 按 k*grid_len 跨步）→ sigmoid → 取最大类
+            float max_score = 0.f;
             int max_class_id = -1;
-            for (size_t k = 0; k < conf_threshold_->size(); ++k)
+            for (size_t k = 0; k < num_classes; ++k)
             {
+                float logit = 0.f;
                 if (model_format_ == ModelFormat::ONNX_FORMAT ||
-                    model_format_ == ModelFormat::TRT_FORMAT ||
-                    model_format_ == ModelFormat::NNRT_FORMAT)
+                    model_format_ == ModelFormat::NNRT_FORMAT ||
+                    model_format_ == ModelFormat::TRT_FORMAT)
                 {
-                    if (score_tensor_float[offset] > conf_threshold_->at(k) && score_tensor_float[offset] > max_score_float)
-                    {
-                        max_score_float = score_tensor_float[offset];
-                        max_class_id = k;
-                    }
+                    // 非量化：logit 来自 score（cls）张量
+                    logit = score_tensor_float[k * grid_len + offset];
                 }
                 else if (model_format_ == ModelFormat::RKNN_FORMAT)
                 {
-                    auto score_thres_i8 = is_qnt ? qnt_f32_to_affine(conf_threshold_->at(k),
-                                                                     zero_points_.at(index * output_per_branch + 1),
-                                                                     scale_.at(index * output_per_branch + 1))
-                                                 : 0;
-                    if (score_tensor_int8[offset] > score_thres_i8 && score_tensor_int8[offset] > max_score_float)
-                    {
-                        max_score_int8 = score_tensor_int8[offset];
-                        max_class_id = k;
-                    }
+
+                    // RKNN 非对称量化：score 层 zp>0 实际以 uint8 存储，
+                    // 必须按 (u8 - zp) × scale 反量化，否则高分字节被误读成负数。
+                    logit = is_qnt
+                                ? deqnt_affine_to_f32(score_tensor_int8[k * grid_len + offset],
+                                                      score_zp, score_scale)
+                                : score_tensor_float[k * grid_len + offset];
                 }
-                offset += grid_len;
+
+                if (sigmoid(logit) > conf_threshold_->at(k) &&
+                    sigmoid(logit) > max_score)
+                {
+                    max_score = sigmoid(logit);
+                    max_class_id = (int)k;
+
+                    // LOG_INFO("is_qnt = {}, logit: {}, sigmoid: {}", is_qnt, logit, sigmoid(logit));
+                }
             }
+
             if (max_class_id != -1)
             {
-                offset += i * grid_w + j;
-                float box[4];
-                float _ltrb[dfl_len_ * 4];
-                for (int k = 0; k < dfl_len_ * 4; ++k)
+                // 读 box [l, t, r, b]（NCHW 按通道跨步，RTMDet 无 DFL；
+                // 通道顺序已核对 mmdet distance_point_bbox_coder）
+                float lrtb[4];
+                for (int k = 0; k < 4; ++k)
                 {
                     if (model_format_ == ModelFormat::ONNX_FORMAT ||
-                        model_format_ == ModelFormat::TRT_FORMAT ||
-                        model_format_ == ModelFormat::NNRT_FORMAT)
+                        model_format_ == ModelFormat::NNRT_FORMAT ||
+                        model_format_ == ModelFormat::TRT_FORMAT)
                     {
-                        _ltrb[k] = box_tensor_float[offset];
+                        lrtb[k] = box_tensor_float[k * grid_len + offset];
                     }
                     else if (model_format_ == ModelFormat::RKNN_FORMAT)
                     {
-                        _ltrb[k] = is_qnt ? deqnt_affine_to_f32(box_tensor_int8[offset],
-                                                                zero_points_.at(index * output_per_branch),
-                                                                scale_.at(index * output_per_branch))
-                                          : 0;
+
+                        // reg 层 zp<0 以 int8 存储；若 zp>0 则按 uint8
+                        lrtb[k] = is_qnt
+                                      ? deqnt_affine_to_f32(box_tensor_int8[k * grid_len + offset],
+                                                            box_zp, box_scale)
+                                      : box_tensor_float[k * grid_len + offset];
                     }
-                    offset += grid_len;
                 }
+
+                // distance2bbox：中心 = j*stride, i*stride（RTMDet with_stride，无 +0.5）
+                float cx = (float)j * stride;
+                float cy = (float)i * stride;
                 Bbox _bbox;
+                _bbox.x1 = cx - lrtb[0]; // left
+                _bbox.y1 = cy - lrtb[1]; // top
+                _bbox.x2 = cx + lrtb[2]; // right
+                _bbox.y2 = cy + lrtb[3]; // bottom
+
+                if (_bbox.x2 <= _bbox.x1 || _bbox.y2 <= _bbox.y1)
+                {
+                    continue;
+                }
+
+                bboxes_.push_back(_bbox);
+                class_id_.push_back(max_class_id);
+                obj_probs_.push_back(max_score);
+                valid_count++;
             }
         }
     }

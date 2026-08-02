@@ -55,9 +55,9 @@ namespace ai_framework
         return tensor_data_ptr_->get_input_tensor_ptr();
     }
 
-    const void *const *Engine::get_output_tensor_ptr()
+    void **&Engine::get_output_tensor_ptr()
     {
-        return (const void *const *)tensor_data_ptr_->get_output_tensor_ptr();
+        return tensor_data_ptr_->get_output_tensor_ptr();
     }
 
     const int Engine::get_input_tensor_count()
