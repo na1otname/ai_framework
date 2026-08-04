@@ -75,6 +75,7 @@ private:
                          const void *kpt_tensor, const void *visibility_tensor,
                          int grid_w, int grid_h, int stride, int index,
                          int output_per_branch);
+
     uint16_t num_of_layers_;
     std::vector<std::string> output_layer_names_;
     std::vector<size_t> output_element_count_;

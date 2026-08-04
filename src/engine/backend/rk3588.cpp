@@ -4,19 +4,6 @@
 
 const int RK3588_CORE_NUM = 3;
 
-// 分配 64 字节对齐的 CPU 缓冲。
-// 非零拷贝模式下输入 buffer 会传给 RGA importbuffer_virtualaddr（要求虚拟地址
-// 64 字节对齐），普通 malloc 只保证 16 字节对齐会导致 RGA 导入失败。
-static void *aligned_alloc_buf(size_t size)
-{
-    if (size == 0)
-        return nullptr;
-    void *ptr = nullptr;
-    if (posix_memalign(&ptr, 64, size) != 0)
-        return nullptr;
-    return ptr;
-}
-
 // 线程安全的核心轮询分配
 int get_core_num()
 {
@@ -210,21 +197,25 @@ bool Rk3588::QueryAndConfigureRuntime()
     // 5. 分配并查询输出属性
     output_attr_ = (rknn_tensor_attr *)malloc(io_num.n_output * sizeof(rknn_tensor_attr));
     memset(output_attr_, 0, io_num.n_output * sizeof(rknn_tensor_attr));
+
+    rknn_tensor_attr output_native_attr_[io_num.n_output];
+    memset(output_native_attr_, 0, sizeof(output_native_attr_));
+
     for (uint32_t i = 0; i < io_num.n_output; i++)
     {
         output_attr_[i].index = i;
 
-        ret = zero_copy_ ? rknn_query(ctx_, RKNN_QUERY_NATIVE_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr))
-                         : rknn_query(ctx_, RKNN_QUERY_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr));
-
+        ret = rknn_query(ctx_, RKNN_QUERY_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr));
+        if (zero_copy_)
+        {
+            ret = rknn_query(ctx_, RKNN_QUERY_NATIVE_OUTPUT_ATTR, &(output_native_attr_[i]), sizeof(rknn_tensor_attr));
+        }
         if (ret != RKNN_SUCC)
         {
             LOG_ERROR("rknn_query output attr {} fail!", i);
             return false;
         }
     }
-
-    // // 6. 为未来的推理申请缓冲区内存
 
     // 7. 配置公共基础 config_
     config_.model_format = ai_framework::RKNN_FORMAT;
@@ -276,10 +267,23 @@ bool Rk3588::QueryAndConfigureRuntime()
             config_.zero_point[name] = output_attr_[i].zp;
         }
         config_.tensor_size[name] = output_attr_[i].n_elems * output_attr_[i].w_stride;
+        // config_.width_equal_stride[name] = (output_attr_[i].w_stride == (uint32_t)output_attr_[i].dims[2]);
+        // config_.stride[name] = output_attr_[i].w_stride;
+
+        // LOG_INFO("Output tensor[{}]: name={}, width_equal_stride={}, stride={}",
+        //          i, name, config_.width_equal_stride[name], config_.stride[name]);
 
         config_.output_fmt_str[name] = get_format_string(output_attr_[i].fmt);
         config_.output_type_str[name] = get_type_string(output_attr_[i].type);
         config_.output_qnt_type_str[name] = get_qnt_type_string(output_attr_[i].qnt_type);
+
+        if (zero_copy_)
+        {
+            std::vector<int64_t> shape;
+            for (uint32_t d = 0; d < output_native_attr_[i].n_dims; d++)
+                shape.push_back(output_native_attr_[i].dims[d]);
+            config_.output_native_layer_shape[name] = shape;
+        }
     }
 
     LOG_INFO("Rk3588 runtime configuration success on core mask: {}", (int)core_mask_);

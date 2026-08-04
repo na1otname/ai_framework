@@ -658,6 +658,8 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                                                       score_zp, score_scale)
                                 : score_tensor_float[k * grid_len + offset];
                 }
+                
+                    // LOG_INFO("is_qnt = {}, logit: {}, sigmoid: {}", is_qnt, logit, sigmoid(logit));
 
                 if (sigmoid(logit) > conf_threshold_->at(k) &&
                     sigmoid(logit) > max_score)
@@ -665,7 +667,6 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                     max_score = sigmoid(logit);
                     max_class_id = (int)k;
 
-                    // LOG_INFO("is_qnt = {}, logit: {}, sigmoid: {}", is_qnt, logit, sigmoid(logit));
                 }
             }
 

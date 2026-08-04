@@ -1,13 +1,14 @@
 #ifndef AI_FRAMEWORK_PLATFORM_ROCKCHIP_RK3588_H_
 #define AI_FRAMEWORK_PLATFORM_ROCKCHIP_RK3588_H_
 
-#include "utils/engine_helper.h"
 #include "ai_framework.h"
+
 #include "rknn_api.h"
 #include <mutex>
 #include <vector>
 #include <map>
 #include <string>
+// #include "utils/engine_helper.h"
 
 class Rk3588 : public ai_framework::AiInstance
 {

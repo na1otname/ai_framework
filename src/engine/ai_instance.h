@@ -38,6 +38,7 @@ namespace ai_framework
         std::map<std::string, size_t> output_single_element_size;
         std::map<std::string, std::vector<int64_t>> input_layer_shape;
         std::map<std::string, std::vector<int64_t>> output_layer_shape;
+        std::map<std::string, std::vector<int64_t>> output_native_layer_shape;
         std::map<std::string, std::string> input_fmt_str;
         std::map<std::string, std::string> output_fmt_str;
         std::map<std::string, std::string> input_type_str;
@@ -52,6 +53,7 @@ namespace ai_framework
         bool rknn_zero_copy{true};
         std::map<std::string, bool> width_equal_stride;
         std::map<std::string, uint32_t> stride;
+
 #endif
 #ifdef TRT
         bool trt_use_unified_memory{false};
@@ -85,6 +87,8 @@ namespace ai_framework
 #ifdef RK3588
         const std::map<std::string, bool> &get_width_equal_stride() const;
         const std::map<std::string, uint32_t> &get_stride() const;
+        std::vector<int8_t> temp_nc1hwc2_buf;
+
 #endif
         void DoInference(void);
 
