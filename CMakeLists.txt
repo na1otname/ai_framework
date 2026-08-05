@@ -5,7 +5,7 @@ project(ai_framework VERSION 0.1.0 LANGUAGES C CXX)
 # 输出系统信息
 message(STATUS "System: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 message(STATUS "Not RK3588")
@@ -52,6 +52,10 @@ find_package(OpenCV REQUIRED)
 
 include(CTest)
 enable_testing()
+
+# 收集 utils 工具源码（供 test 使用），必须在 add_subdirectory(test) 之前定义
+file(GLOB_RECURSE UTILS "src/utils/*.cpp")
+
 add_subdirectory(test)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})

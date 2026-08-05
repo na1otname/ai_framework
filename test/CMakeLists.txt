@@ -5,7 +5,9 @@
 # 测试可执行文件
 add_executable(test_ai_framework
     main.cpp
+    ${UTILS}
 )
+
 
 
 

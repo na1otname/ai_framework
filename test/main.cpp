@@ -9,6 +9,7 @@
 #include "engine/ai_instance.h"
 #include "image_process/yolo/yolo_postprocess.h"
 #include "image_process/yolo/yolo_preprocess.h"
+#include "utils/tools.h"
 
 int main()
 {
@@ -26,19 +27,24 @@ int main()
     YoloPreProcess preprocessor(320, false);
 
     preprocessor.Run({frame}, input);
-    std::vector<float> conf_threshold = {0.4f};
-    PostProcess postprocessor(engine.get_config(), conf_threshold, 0.45f, 0.4f);
+    std::vector<float> conf_threshold = {0.25f};
+    PostProcess postprocessor(engine.get_config(), conf_threshold, 0.35f, 0.4f);
 
     engine.DoInference();
     postprocessor.Run(output);
 
     std::vector<PostProcess::Result> result = postprocessor.get_result();
-
-    for (const auto res : result)
-    {
-        cv::rectangle(frame, cv::Point(res.box.x1, res.box.y1), cv::Point(res.box.x2, res.box.y2), cv::Scalar(0, 255, 0), 2);
-        cv::imwrite("/home/orangepi/Code/ai_framework/source/result.jpg", frame);
-    }
+    std::vector<std::string> labels = {"hand"};
+    // 无显示环境下直接保存标注结果图（避免 cv::imshow 的 GTK 后端初始化失败）
+    cv::Mat annotated =
+        GetImageResult(frame, preprocessor.get_target_side_length(), result, labels);
+    cv::imwrite("/home/orangepi/Code/ai_framework/source/result.jpg", annotated);
+    printf("[6/6] Result image saved to source/result.jpg\n");
+    // for (const auto res : result)
+    // {
+    //     cv::rectangle(frame, cv::Point(res.box.x1, res.box.y1), cv::Point(res.box.x2, res.box.y2), cv::Scalar(0, 255, 0), 2);
+    //     cv::imwrite("/home/orangepi/Code/ai_framework/source/result.jpg", frame);
+    // }
 
     return 0;
 }
