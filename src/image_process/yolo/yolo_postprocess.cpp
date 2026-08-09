@@ -656,7 +656,7 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                     logit = is_qnt
                                 ? deqnt_affine_to_f32(score_tensor_int8[k * grid_len + offset],
                                                       score_zp, score_scale)
-                                : score_tensor_float[k * grid_len + offset];
+                                : fp16_to_f32(score_tensor_float[k * grid_len + offset]);
                 }
 
                 if (sigmoid(logit) > conf_threshold_->at(k) &&
@@ -665,7 +665,7 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                     max_score = sigmoid(logit);
                     max_class_id = (int)k;
 
-                    LOG_INFO("is_qnt = {}, logit: {}, sigmoid: {}", is_qnt, logit, sigmoid(logit));
+                    // LOG_INFO("is_qnt = {}, logit: {}, sigmoid: {}", is_qnt, logit, sigmoid(logit));
                 }
             }
 
@@ -689,7 +689,7 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                         lrtb[k] = is_qnt
                                       ? deqnt_affine_to_f32(box_tensor_int8[k * grid_len + offset],
                                                             box_zp, box_scale)
-                                      : box_tensor_float[k * grid_len + offset];
+                                      : fp16_to_f32(box_tensor_float[k * grid_len + offset]);
                     }
                 }
 

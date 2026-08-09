@@ -22,13 +22,13 @@ int main()
     auto input = engine.get_input_tensor_ptr();
     auto output = engine.get_output_tensor_ptr();
 
-    const char *image_path = "/home/orangepi/Code/ai_framework/source/test_2.jpg";
+    const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
     cv::Mat frame = cv::imread(image_path);
     YoloPreProcess preprocessor(320, false);
 
     preprocessor.Run({frame}, input);
-    std::vector<float> conf_threshold = {0.25f};
-    PostProcess postprocessor(engine.get_config(), conf_threshold, 0.35f, 0.4f);
+    std::vector<float> conf_threshold = {0.4f};
+    PostProcess postprocessor(engine.get_config(), conf_threshold, 0.4f, 0.4f);
 
     engine.DoInference();
     postprocessor.Run(output);

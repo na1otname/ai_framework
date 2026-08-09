@@ -35,8 +35,10 @@ private:
     rknn_output *output_{nullptr};
     rknn_tensor_attr *input_attr_{nullptr};
     rknn_tensor_attr *output_attr_{nullptr};
+    rknn_tensor_attr *output_tmp_attr_{nullptr};
     bool zero_copy_{true};
     rknn_tensor_type input_type_{RKNN_TENSOR_UINT8};
+    ai_framework::TensorData *tensor_data_ptr_{nullptr};
 };
 
 #endif // AI_FRAMEWORK_PLATFORM_ROCKCHIP_RK3588_H_

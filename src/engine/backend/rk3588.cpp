@@ -4,6 +4,57 @@
 
 const int RK3588_CORE_NUM = 3;
 
+template <typename T>
+int NC1HWC2_to_NCHW(const void *src, void *dst, const int *dims, int channel, int h, int w)
+{
+    int batch = dims[0];
+    int C1 = dims[1];
+    int C2 = dims[4];
+    int hw_src = dims[2] * dims[3];
+    int hw_dst = h * w;
+
+    const T *src_ptr = static_cast<const T *>(src);
+    T *dst_ptr = static_cast<T *>(dst);
+
+    for (int i = 0; i < batch; i++)
+    {
+        const T *src_b = src_ptr + i * C1 * hw_src * C2;
+        T *dst_b = dst_ptr + i * channel * hw_dst;
+        for (int c = 0; c < channel; ++c)
+        {
+            int plane = c / C2;
+            const T *src_bc = src_b + plane * hw_src * C2;
+            int offset = c % C2;
+            for (int cur_h = 0; cur_h < h; ++cur_h)
+            {
+                for (int cur_w = 0; cur_w < w; ++cur_w)
+                {
+                    int cur_hw = cur_h * w + cur_w;
+                    dst_b[c * hw_dst + cur_hw] = src_bc[C2 * cur_hw + offset];
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int NC1HWC2_to_NCHW(const std::string &type_str, const void *src, void *dst, const int *dims, int channel, int h, int w)
+{
+    if (type_str == "INT8")
+        return NC1HWC2_to_NCHW<int8_t>(src, dst, dims, channel, h, w);
+    else if (type_str == "UINT8")
+        return NC1HWC2_to_NCHW<uint8_t>(src, dst, dims, channel, h, w);
+    else if (type_str == "FP32")
+        return NC1HWC2_to_NCHW<float>(src, dst, dims, channel, h, w);
+    else if (type_str == "FP16" || type_str == "BF16" || type_str == "INT16" || type_str == "UINT16")
+        return NC1HWC2_to_NCHW<uint16_t>(src, dst, dims, channel, h, w); // 2字节类型统一按 16-bit 搬移
+    else if (type_str == "INT32" || type_str == "UINT32")
+        return NC1HWC2_to_NCHW<uint32_t>(src, dst, dims, channel, h, w);
+
+    return -1; // 未知的类型
+}
+
 // 线程安全的核心轮询分配
 int get_core_num()
 {
@@ -54,6 +105,16 @@ Rk3588::~Rk3588()
     {
         free(output_attr_);
         output_attr_ = nullptr;
+    }
+    if (output_tmp_attr_)
+    {
+        free(output_tmp_attr_);
+        output_tmp_attr_ = nullptr;
+    }
+    if (tensor_data_ptr_)
+    {
+        free(tensor_data_ptr_);
+        tensor_data_ptr_ = nullptr;
     }
     if (ctx_ != 0)
     {
@@ -198,18 +259,24 @@ bool Rk3588::QueryAndConfigureRuntime()
     output_attr_ = (rknn_tensor_attr *)malloc(io_num.n_output * sizeof(rknn_tensor_attr));
     memset(output_attr_, 0, io_num.n_output * sizeof(rknn_tensor_attr));
 
-    rknn_tensor_attr output_native_attr_[io_num.n_output];
-    memset(output_native_attr_, 0, sizeof(output_native_attr_));
+    if (zero_copy_)
+    {
+        output_tmp_attr_ = (rknn_tensor_attr *)malloc(io_num.n_output * sizeof(rknn_tensor_attr));
+        memset(output_tmp_attr_, 0, io_num.n_output * sizeof(rknn_tensor_attr));
+    }
 
     for (uint32_t i = 0; i < io_num.n_output; i++)
     {
         output_attr_[i].index = i;
 
-        ret = rknn_query(ctx_, RKNN_QUERY_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr));
+        ret = zero_copy_ ? rknn_query(ctx_, RKNN_QUERY_NATIVE_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr))
+                         : rknn_query(ctx_, RKNN_QUERY_OUTPUT_ATTR, &output_attr_[i], sizeof(rknn_tensor_attr));
         if (zero_copy_)
         {
-            ret = rknn_query(ctx_, RKNN_QUERY_NATIVE_OUTPUT_ATTR, &(output_native_attr_[i]), sizeof(rknn_tensor_attr));
+            output_tmp_attr_[i].index = i;
+            ret = rknn_query(ctx_, RKNN_QUERY_OUTPUT_ATTR, &output_tmp_attr_[i], sizeof(rknn_tensor_attr));
         }
+
         if (ret != RKNN_SUCC)
         {
             LOG_ERROR("rknn_query output attr {} fail!", i);
@@ -237,7 +304,7 @@ bool Rk3588::QueryAndConfigureRuntime()
             shape.push_back(input_attr_[i].dims[d]);
         config_.input_layer_shape[name] = shape;
 
-        config_.tensor_size[name] = input_attr_[i].n_elems * input_attr_[i].w_stride;
+        config_.tensor_size[name] = input_attr_[i].size_with_stride;
         config_.width_equal_stride[name] = (input_attr_[i].w_stride == (uint32_t)input_attr_[i].dims[2]);
         config_.stride[name] = input_attr_[i].w_stride;
 
@@ -254,10 +321,25 @@ bool Rk3588::QueryAndConfigureRuntime()
         config_.output_element_count[name] = output_attr_[i].n_elems;
         config_.output_single_element_size[name] = output_attr_[i].w_stride;
 
-        std::vector<int64_t> shape;
-        for (uint32_t d = 0; d < output_attr_[i].n_dims; d++)
-            shape.push_back(output_attr_[i].dims[d]);
-        config_.output_layer_shape[name] = shape;
+        if (zero_copy_)
+        {
+            std::vector<int64_t> shape;
+            for (uint32_t d = 0; d < output_tmp_attr_[i].n_dims; d++)
+                shape.push_back(output_tmp_attr_[i].dims[d]);
+            config_.output_layer_shape[name] = shape;
+
+            std::vector<int64_t> shape_native;
+            for (uint32_t d = 0; d < output_attr_[i].n_dims; d++)
+                shape_native.push_back(output_attr_[i].dims[d]);
+            config_.output_native_layer_shape[name] = shape_native;
+        }
+        else
+        {
+            std::vector<int64_t> shape;
+            for (uint32_t d = 0; d < output_attr_[i].n_dims; d++)
+                shape.push_back(output_attr_[i].dims[d]);
+            config_.output_layer_shape[name] = shape;
+        }
 
         if ((output_attr_[i].type == RKNN_TENSOR_INT8 ||
              output_attr_[i].type == RKNN_TENSOR_UINT8) &&
@@ -266,7 +348,8 @@ bool Rk3588::QueryAndConfigureRuntime()
             config_.scale[name] = output_attr_[i].scale;
             config_.zero_point[name] = output_attr_[i].zp;
         }
-        config_.tensor_size[name] = output_attr_[i].n_elems * output_attr_[i].w_stride;
+        config_.tensor_size[name] = output_attr_[i].size_with_stride;
+        ;
         // config_.width_equal_stride[name] = (output_attr_[i].w_stride == (uint32_t)output_attr_[i].dims[2]);
         // config_.stride[name] = output_attr_[i].w_stride;
 
@@ -276,14 +359,6 @@ bool Rk3588::QueryAndConfigureRuntime()
         config_.output_fmt_str[name] = get_format_string(output_attr_[i].fmt);
         config_.output_type_str[name] = get_type_string(output_attr_[i].type);
         config_.output_qnt_type_str[name] = get_qnt_type_string(output_attr_[i].qnt_type);
-
-        if (zero_copy_)
-        {
-            std::vector<int64_t> shape;
-            for (uint32_t d = 0; d < output_native_attr_[i].n_dims; d++)
-                shape.push_back(output_native_attr_[i].dims[d]);
-            config_.output_native_layer_shape[name] = shape;
-        }
     }
 
     LOG_INFO("Rk3588 runtime configuration success on core mask: {}", (int)core_mask_);
@@ -402,6 +477,7 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
             tensor_data.get_output_tensor_ptr()[i] = buffer;
         }
     }
+    tensor_data_ptr_ = &tensor_data; // 保存指针，供 DoInference() 使用
 }
 
 void Rk3588::DoInference()
@@ -413,6 +489,41 @@ void Rk3588::DoInference()
         {
             LOG_ERROR("rknn_run fail! ret={}", ret);
             return;
+        }
+
+        auto output_tensors = tensor_data_ptr_->get_output_tensor_ptr();
+        for (size_t i = 0; i < config_.output_tensors_count; ++i)
+        {
+            const auto &name = config_.output_index_to_name.at(i);
+            if (config_.output_fmt_str.at(name) == "NC1HWC2")
+            {
+                const auto &shape = config_.output_layer_shape.at(name);
+                const auto &native_shape = config_.output_native_layer_shape.at(name);
+                const std::string type_str = config_.output_type_str.at(name);
+
+                void *zero_copy_buf = output_tensors[i];
+
+                int dims[5] = {
+                    static_cast<int>(native_shape[0]),
+                    static_cast<int>(native_shape[1]),
+                    static_cast<int>(native_shape[2]),
+                    static_cast<int>(native_shape[3]),
+                    static_cast<int>(native_shape[4])};
+
+                const int channel = static_cast<int>(shape[1]);
+                const int h = static_cast<int>(shape[2]);
+                const int w = static_cast<int>(shape[3]);
+
+                void *temp_buffer = malloc(output_tmp_attr_[i].size_with_stride);
+
+                // LOG_INFO("NCHW size:{}", output_tmp_attr_[i].size_with_stride);
+                NC1HWC2_to_NCHW(type_str, zero_copy_buf, temp_buffer, dims, channel, h, w);
+
+                memcpy(output_tensors[i], temp_buffer, output_tmp_attr_[i].size_with_stride);
+
+                free(temp_buffer);
+                temp_buffer = nullptr;
+            }
         }
     }
     else

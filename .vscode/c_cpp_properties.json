@@ -5,8 +5,11 @@
             "includePath": [
                 "${workspaceFolder}/**"
             ],
-            "defines": [],
+            "defines": [
+                "RK3588=1"
+            ],
             "cStandard": "c17",
+            "intelliSenseMode": "gcc-arm64",
             "compilerPath": "/usr/bin/aarch64-linux-gnu-gcc"
         }
     ],

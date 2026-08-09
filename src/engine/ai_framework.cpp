@@ -188,32 +188,63 @@ namespace ai_framework
 
         for (uint16_t i = 0; i < config_.output_tensors_count; i++)
         {
-            auto &name = config_.output_index_to_name[i];
-            auto &shape = config_.output_layer_shape[name];
+            if (config_.rknn_zero_copy)
+            {
+                auto &name = config_.output_index_to_name[i];
+                auto &shape = config_.output_native_layer_shape[name];
 
-            // 安全地获取前 4 个维度。如果维度不足 4 维，后面补 0（以匹配原格式 dims=[%d, %d, %d, %d]）
-            int64_t d0 = shape.size() > 0 ? shape[0] : 0;
-            int64_t d1 = shape.size() > 1 ? shape[1] : 0;
-            int64_t d2 = shape.size() > 2 ? shape[2] : 0;
-            int64_t d3 = shape.size() > 3 ? shape[3] : 0;
-            int64_t d4 = shape.size() > 4 ? shape[4] : 0; // 如果输出是5维，获取第5维，否则为0
+                // 安全地获取前 4 个维度。如果维度不足 4 维，后面补 0（以匹配原格式 dims=[%d, %d, %d, %d]）
+                int64_t d0 = shape.size() > 0 ? shape[0] : 0;
+                int64_t d1 = shape.size() > 1 ? shape[1] : 0;
+                int64_t d2 = shape.size() > 2 ? shape[2] : 0;
+                int64_t d3 = shape.size() > 3 ? shape[3] : 0;
+                int64_t d4 = shape.size() > 4 ? shape[4] : 0; // 如果输出是5维，获取第5维，否则为0
 
-            // 格式化输出所有属性
-            // 注意：fmt, type, qnt_type 在 Config 中暂无对应字段，当前使用 "N/A" 占位
-            auto output_scale_it = config_.scale.find(name);
-            auto output_zp_it = config_.zero_point.find(name);
-            std::string output_zp_str = (output_zp_it != config_.zero_point.end()) ? std::to_string(output_zp_it->second) : "N/A";
-            std::string output_scale_str = (output_scale_it != config_.scale.end()) ? std::to_string(output_scale_it->second) : "N/A";
-            LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
-                     i,
-                     name.c_str(),
-                     shape.size(),
-                     d0, d1, d2, d3, d4,
-                     config_.output_element_count[name],
-                     config_.tensor_size[name],
-                     config_.output_fmt_str[name], config_.output_type_str[name], config_.output_qnt_type_str[name],
-                     output_zp_str,
-                     output_scale_str);
+                // 格式化输出所有属性
+                // 注意：fmt, type, qnt_type 在 Config 中暂无对应字段，当前使用 "N/A" 占位
+                auto output_scale_it = config_.scale.find(name);
+                auto output_zp_it = config_.zero_point.find(name);
+                std::string output_zp_str = (output_zp_it != config_.zero_point.end()) ? std::to_string(output_zp_it->second) : "N/A";
+                std::string output_scale_str = (output_scale_it != config_.scale.end()) ? std::to_string(output_scale_it->second) : "N/A";
+                LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
+                         i,
+                         name.c_str(),
+                         shape.size(),
+                         d0, d1, d2, d3, d4,
+                         config_.output_element_count[name],
+                         config_.tensor_size[name],
+                         config_.output_fmt_str[name], config_.output_type_str[name], config_.output_qnt_type_str[name],
+                         output_zp_str,
+                         output_scale_str);
+            }
+            else
+            {
+                auto &name = config_.output_index_to_name[i];
+                auto &shape = config_.output_layer_shape[name];
+
+                // 安全地获取前 4 个维度。如果维度不足 4 维，后面补 0（以匹配原格式 dims=[%d, %d, %d, %d]）
+                int64_t d0 = shape.size() > 0 ? shape[0] : 0;
+                int64_t d1 = shape.size() > 1 ? shape[1] : 0;
+                int64_t d2 = shape.size() > 2 ? shape[2] : 0;
+                int64_t d3 = shape.size() > 3 ? shape[3] : 0;
+
+                // 格式化输出所有属性
+                // 注意：fmt, type, qnt_type 在 Config 中暂无对应字段，当前使用 "N/A" 占位
+                auto output_scale_it = config_.scale.find(name);
+                auto output_zp_it = config_.zero_point.find(name);
+                std::string output_zp_str = (output_zp_it != config_.zero_point.end()) ? std::to_string(output_zp_it->second) : "N/A";
+                std::string output_scale_str = (output_scale_it != config_.scale.end()) ? std::to_string(output_scale_it->second) : "N/A";
+                LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
+                         i,
+                         name.c_str(),
+                         shape.size(),
+                         d0, d1, d2, d3,
+                         config_.output_element_count[name],
+                         config_.tensor_size[name],
+                         config_.output_fmt_str[name], config_.output_type_str[name], config_.output_qnt_type_str[name],
+                         output_zp_str,
+                         output_scale_str);
+            }
         }
 
         LOG_INFO("==============================");
