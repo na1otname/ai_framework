@@ -17,34 +17,6 @@ else()
 endif()
 
 
-# find_package(ai_instance_tensorrt QUIET)
-# if (ai_instance_tensorrt_FOUND)
-#     message(STATUS "Found ai_instance_tensorrt")
-#     set(AI_LIB ${ai_instance_tensorrt_LIBS})
-#     include_directories(/usr/local/cuda/include)
-#     add_definitions(-DTRT=1)
-# else ()
-#     find_package(ai_instance_onnx QUIET)
-#     if (ai_instance_onnx_FOUND)
-#         message(STATUS "Found ai_instance_onnx")
-#         set(AI_LIB ${ai_instance_onnx_LIBS})
-#         add_definitions(-DONNX=1)
-#     endif ()
-# endif ()
-# find_package(ai_instance_rk3588 QUIET)
-# if (ai_instance_rk3588_FOUND)
-#     message(STATUS "Found ai_instance_rk3588")
-#     set(AI_LIB ${ai_instance_rk3588_LIBS})
-#     add_definitions(-DRK3588=1)
-# endif ()
-# find_package(ai_instance_nnrt QUIET)
-# if (ai_instance_nnrt_FOUND)
-#     message(STATUS "Found ai_instance_nnrt")
-#     set(AI_LIB ${ai_instance_nnrt_LIBS})
-#     add_definitions(-DNNRT=1)
-# endif ()
-# message(STATUS "AI_LIB is ${AI_LIB}")
-
 set(LIB_ARCH "aarch64")
 set(DEVICE_NAME "RK3588")
 
@@ -56,13 +28,17 @@ enable_testing()
 # 收集 utils 工具源码（供 test 使用），必须在 add_subdirectory(test) 之前定义
 file(GLOB_RECURSE UTILS "src/utils/*.cpp")
 
-add_subdirectory(test)
+# 添加测试项目
+add_subdirectory(test/rtmdet_test)
+
+
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
 include(CPack)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 
 # set(Eingine_INCLUDE ${CMAKE_SOURCE_DIR}/src/engine)

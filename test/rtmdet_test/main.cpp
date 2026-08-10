@@ -7,8 +7,8 @@
 #include <opencv2/opencv.hpp>
 
 #include "engine/ai_instance.h"
-#include "image_process/yolo/yolo_postprocess.h"
-#include "image_process/yolo/yolo_preprocess.h"
+#include "image_process/detection/detection_postprocess.h"
+#include "image_process/detection/detection_preprocess.h"
 #include "utils/tools.h"
 
 int main()
@@ -22,7 +22,7 @@ int main()
     auto input = engine.get_input_tensor_ptr();
     auto output = engine.get_output_tensor_ptr();
 
-    const char *image_path = "/home/orangepi/Code/ai_framework/source/test_2.jpg";
+    const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
     cv::Mat frame = cv::imread(image_path);
     PreProcess preprocessor(320, false);
 

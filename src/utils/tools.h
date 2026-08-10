@@ -1,6 +1,6 @@
 #pragma once
 #include "chrono"
-#include"image_process/yolo/yolo_postprocess.h"
+#include "image_process/detection/detection_postprocess.h"
 #include "opencv2/opencv.hpp"
 
 void ShowResults(const cv::Mat &original_image, const int target_side_length,

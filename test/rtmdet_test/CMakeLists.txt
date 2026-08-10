@@ -27,8 +27,8 @@ target_link_libraries(test_ai_framework PRIVATE
     spdlog
     fmt
     systemd
-    yolo_preprocess
-    yolo_postprocess
+    detection_preprocess
+    detection_postprocess
 
 )
 # 注册 CTest 测试
