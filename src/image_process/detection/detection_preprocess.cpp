@@ -1,4 +1,4 @@
-#include "yolo_preprocess.h"
+#include "detection_preprocess.h"
 
 #ifdef RK3588
 #include <cstdlib>
@@ -9,10 +9,10 @@
 #include "im2d.hpp"
 #endif
 
-YoloPreProcess::YoloPreProcess(int target_side_length, bool debug)
+PreProcess::PreProcess(int target_side_length, bool debug)
     : target_side_length_(target_side_length), debug_(debug) {}
 
-void YoloPreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
+void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
 {
     for (size_t i = 0; i < input.size(); ++i)
     {
@@ -102,7 +102,7 @@ void YoloPreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
     }
 }
 
-void YoloPreProcess::MakeSquare(const cv::Mat &src, cv::Mat &dst)
+void PreProcess::MakeSquare(const cv::Mat &src, cv::Mat &dst)
 {
     // 获取图像的宽和高
     int width = src.cols;
@@ -129,7 +129,7 @@ void YoloPreProcess::MakeSquare(const cv::Mat &src, cv::Mat &dst)
                        cv::Scalar(114, 114, 114));
 }
 
-uint64_t YoloPreProcess::PopulateData(
+uint64_t PreProcess::PopulateData(
     const cv::Mat &data,
     float *dst,
     const std::vector<float> &mean,

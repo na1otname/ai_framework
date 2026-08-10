@@ -24,7 +24,7 @@ int main()
 
     const char *image_path = "/home/orangepi/Code/ai_framework/source/test_2.jpg";
     cv::Mat frame = cv::imread(image_path);
-    YoloPreProcess preprocessor(320, false);
+    PreProcess preprocessor(320, false);
 
     preprocessor.Run({frame}, input);
     std::vector<float> conf_threshold = {0.4f};

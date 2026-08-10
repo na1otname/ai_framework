@@ -1,11 +1,11 @@
 #pragma once
 #include "opencv2/opencv.hpp"
 
-class YoloPreProcess
+class PreProcess
 {
 public:
-    YoloPreProcess() = delete;
-    YoloPreProcess(int target_side_length, bool debug = false);
+    PreProcess() = delete;
+    PreProcess(int target_side_length, bool debug = false);
     void Run(const std::vector<cv::Mat> &input, void *tensors[]);
     const int &get_target_side_length() const { return target_side_length_; }
 
