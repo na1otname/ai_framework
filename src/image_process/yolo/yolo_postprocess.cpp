@@ -612,10 +612,12 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                                     int stride, int index, int output_per_branch)
 {
     // RTMDet: score 层索引 = index，box 层索引 = index + output_per_branch
-    const float *box_tensor_float = reinterpret_cast<const float *>(box_tensor);
-    const float *score_tensor_float = reinterpret_cast<const float *>(score_tensor);
+    // const float *box_tensor_float = reinterpret_cast<const float *>(box_tensor);
+    // const float *score_tensor_float = reinterpret_cast<const float *>(score_tensor);
     const int8_t *box_tensor_int8 = reinterpret_cast<const int8_t *>(box_tensor);
     const int8_t *score_tensor_int8 = reinterpret_cast<const int8_t *>(score_tensor);
+    const uint16_t *box_tensor_float16 = reinterpret_cast<const uint16_t *>(box_tensor);
+    const uint16_t *score_tensor_float16 = reinterpret_cast<const uint16_t *>(score_tensor);
 
     bool is_qnt = zero_points_.empty() ? false : true;
     const float score_zp = is_qnt ? zero_points_.at(index) : 0.f;
@@ -646,7 +648,7 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                     model_format_ == ModelFormat::TRT_FORMAT)
                 {
                     // 非量化：logit 来自 score（cls）张量
-                    logit = score_tensor_float[k * grid_len + offset];
+                    logit = score_tensor_float16[k * grid_len + offset];
                 }
                 else if (model_format_ == ModelFormat::RKNN_FORMAT)
                 {
@@ -656,13 +658,13 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                     logit = is_qnt
                                 ? deqnt_affine_to_f32(score_tensor_int8[k * grid_len + offset],
                                                       score_zp, score_scale)
-                                : fp16_to_f32(score_tensor_float[k * grid_len + offset]);
+                                : fp16_to_f32(score_tensor_float16[k * grid_len + offset]);
                 }
-
-                if (sigmoid(logit) > conf_threshold_->at(k) &&
-                    sigmoid(logit) > max_score)
+                float score = sigmoid(logit);
+                if (score > conf_threshold_->at(k) &&
+                    score > max_score)
                 {
-                    max_score = sigmoid(logit);
+                    max_score = score;
                     max_class_id = (int)k;
 
                     // LOG_INFO("is_qnt = {}, logit: {}, sigmoid: {}", is_qnt, logit, sigmoid(logit));
@@ -680,7 +682,7 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                         model_format_ == ModelFormat::NNRT_FORMAT ||
                         model_format_ == ModelFormat::TRT_FORMAT)
                     {
-                        lrtb[k] = box_tensor_float[k * grid_len + offset];
+                        lrtb[k] = box_tensor_float16[k * grid_len + offset];
                     }
                     else if (model_format_ == ModelFormat::RKNN_FORMAT)
                     {
@@ -689,7 +691,7 @@ uint16_t PostProcess::ProcessRtmdet(const void *box_tensor, const void *score_te
                         lrtb[k] = is_qnt
                                       ? deqnt_affine_to_f32(box_tensor_int8[k * grid_len + offset],
                                                             box_zp, box_scale)
-                                      : fp16_to_f32(box_tensor_float[k * grid_len + offset]);
+                                      : fp16_to_f32(box_tensor_float16[k * grid_len + offset]);
                     }
                 }
 

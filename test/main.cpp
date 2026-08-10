@@ -15,14 +15,14 @@ int main()
 {
     // === 1. 加载模型（Rk3588 → TensorData → BindInputAndOutput） ===
     const char *model_path =
-        "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320_static_int8.rknn";
+        "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320_static_fp16.rknn";
     printf("[1/6] Loading model: %s\n", model_path);
     auto engine = ai_framework::Engine(ai_framework::RKNN_FORMAT, model_path);
 
     auto input = engine.get_input_tensor_ptr();
     auto output = engine.get_output_tensor_ptr();
 
-    const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
+    const char *image_path = "/home/orangepi/Code/ai_framework/source/test_2.jpg";
     cv::Mat frame = cv::imread(image_path);
     YoloPreProcess preprocessor(320, false);
 
