@@ -5,6 +5,7 @@ target_include_directories(detection_preprocess
 		${OpenCV_INCLUDE_DIRS}
 		${RGA_API_INCLUDE_PATH}
 		${CMAKE_CURRENT_SOURCE_DIR}
+		
 
 )
 target_link_libraries(detection_preprocess
@@ -13,12 +14,16 @@ target_link_libraries(detection_preprocess
 		${OpenCV_LIBS}
 )
 
-add_library(detection_postprocess detection/detection_postprocess.cpp)
+add_library(detection_postprocess 
+	detection/detection_postprocess.cpp
+	topdown/topdown_postprocess.h
+	topdown/topdown_postprocess.cpp)
 target_include_directories(detection_postprocess
 	PUBLIC
 		${OpenCV_INCLUDE_DIRS}
 		${RGA_API_INCLUDE_PATH}
 		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_SOURCE_DIR}/src
 		engine
 )
 target_link_libraries(detection_postprocess

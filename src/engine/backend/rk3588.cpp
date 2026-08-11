@@ -128,13 +128,13 @@ void Rk3588::Initialize(const char *model_data, const uint64_t size)
     int ret = 0;
     if (dup_ctx_ != nullptr)
     {
-        LOG_INFO("Reuse weight from other context via rknn_dup_context");
+        LOG_DEBUG("Reuse weight from other context via rknn_dup_context");
         // 正确的参数顺序：rknn_dup_context(源Context指针, 目标Context的地址)
         ret = rknn_dup_context(dup_ctx_, &ctx_);
     }
     else
     {
-        LOG_INFO("Load model from memory buffer and init new context");
+        LOG_DEBUG("Load model from memory buffer and init new context");
         ret = rknn_init(&ctx_, (void *)model_data, size, 0, NULL);
     }
 
@@ -154,12 +154,12 @@ void Rk3588::Initialize(const char *model_path)
     int ret = 0;
     if (dup_ctx_ != nullptr)
     {
-        LOG_INFO("Reuse weight from other context, skip reading file: {}", model_path);
+        LOG_DEBUG("Reuse weight from other context, skip reading file: {}", model_path);
         ret = rknn_dup_context(dup_ctx_, &ctx_);
     }
     else
     {
-        LOG_INFO("Load model from file: {} and init new context", model_path);
+        LOG_DEBUG("Load model from file: {} and init new context", model_path);
         FILE *fp = fopen(model_path, "rb");
         if (fp == nullptr)
         {
@@ -224,7 +224,7 @@ bool Rk3588::QueryAndConfigureRuntime()
     rknn_sdk_version version;
     if (rknn_query(ctx_, RKNN_QUERY_SDK_VERSION, &version, sizeof(version)) == RKNN_SUCC)
     {
-        LOG_INFO("RKNN API version: {}, Driver version: {}", version.api_version, version.drv_version);
+        LOG_DEBUG("RKNN API version: {}, Driver version: {}", version.api_version, version.drv_version);
     }
 
     // 3. 获取输入输出 Tensor 数量
@@ -361,7 +361,7 @@ bool Rk3588::QueryAndConfigureRuntime()
         config_.output_qnt_type_str[name] = get_qnt_type_string(output_attr_[i].qnt_type);
     }
 
-    LOG_INFO("Rk3588 runtime configuration success on core mask: {}", (int)core_mask_);
+    LOG_DEBUG("Rk3588 runtime configuration success on core mask: {}", (int)core_mask_);
     return true;
 }
 
@@ -392,12 +392,12 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
                 continue;
             }
 
-            LOG_INFO("zero-copy input mem[{}]: virt={} fd={} size={} fmt={}",
-                     i,
-                     input_mem[i]->virt_addr,
-                     input_mem[i]->fd,
-                     input_attr_[i].size_with_stride,
-                     input_attr_[i].fmt);
+            LOG_DEBUG("zero-copy input mem[{}]: virt={} fd={} size={} fmt={}",
+                      i,
+                      input_mem[i]->virt_addr,
+                      input_mem[i]->fd,
+                      input_attr_[i].size_with_stride,
+                      input_attr_[i].fmt);
 
             // 将 DMA buffer 地址暴露给外部，统一通过 get_input_tensor_ptr() 写入数据
             tensor_data.get_input_tensor_ptr()[i] = input_mem[i]->virt_addr;
@@ -419,12 +419,12 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
                 LOG_ERROR("rknn_set_io_mem(output[{}]) fail! ret={}", i, ret);
                 continue;
             }
-            LOG_INFO("zero-copy output mem[{}]: virt={} fd={} size={} fmt={} ",
-                     i,
-                     output_mem[i]->virt_addr,
-                     output_mem[i]->fd,
-                     output_attr_[i].size_with_stride,
-                     output_attr_[i].fmt);
+            LOG_DEBUG("zero-copy output mem[{}]: virt={} fd={} size={} fmt={} ",
+                      i,
+                      output_mem[i]->virt_addr,
+                      output_mem[i]->fd,
+                      output_attr_[i].size_with_stride,
+                      output_attr_[i].fmt);
 
             // 将 DMA buffer 地址暴露给外部，统一通过 get_output_tensor_ptr() 读取结果
             tensor_data.get_output_tensor_ptr()[i] = output_mem[i]->virt_addr;

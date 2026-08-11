@@ -16,6 +16,8 @@ add_executable(test_ai_framework
 target_include_directories(test_ai_framework PRIVATE
     ${RKNN_API_INCLUDE_PATH}
     ${RGA_API_INCLUDE_PATH}
+    ${IMAGE_PROCESS_DIR}
+    ${IMAGE_PROCESS_DIR}/detection
     ${CMAKE_SOURCE_DIR}/src
 )
 

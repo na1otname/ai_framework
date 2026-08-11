@@ -28,10 +28,11 @@ enable_testing()
 # 收集 utils 工具源码（供 test 使用），必须在 add_subdirectory(test) 之前定义
 file(GLOB_RECURSE UTILS "src/utils/*.cpp")
 
+# 供 test 使用的共享目录变量，必须在 add_subdirectory(test) 之前定义
+set(IMAGE_PROCESS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/image_process)
+
 # 添加测试项目
 add_subdirectory(test/rtmdet_test)
-
-
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})

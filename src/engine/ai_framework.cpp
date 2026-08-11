@@ -154,9 +154,9 @@ namespace ai_framework
 
     void AiInstance::PrintLayerInfo()
     {
-        LOG_INFO("=== AiInstance Layer Info ===");
+        LOG_DEBUG("=== AiInstance Layer Info ===");
 
-        LOG_INFO("model input num: {}, output num: {}", config_.input_tensors_count, config_.output_tensors_count);
+        LOG_DEBUG("model input num: {}, output num: {}", config_.input_tensors_count, config_.output_tensors_count);
         for (uint16_t i = 0; i < config_.input_tensors_count; i++)
         {
             auto &name = config_.input_index_to_name[i];
@@ -174,16 +174,16 @@ namespace ai_framework
             auto input_zp_it = config_.zero_point.find(name);
             std::string input_zp_str = (input_zp_it != config_.zero_point.end()) ? std::to_string(input_zp_it->second) : "N/A";
             std::string input_scale_str = (input_scale_it != config_.scale.end()) ? std::to_string(input_scale_it->second) : "N/A";
-            LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
-                     i,
-                     name.c_str(),
-                     shape.size(),
-                     d0, d1, d2, d3,
-                     config_.input_element_count[name],
-                     config_.tensor_size[name],
-                     config_.input_fmt_str[name], config_.input_type_str[name], config_.input_qnt_type_str[name], // 如果未来 Config 加了这三个字段，请替换此处
-                     input_zp_str,
-                     input_scale_str);
+            LOG_DEBUG("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
+                      i,
+                      name.c_str(),
+                      shape.size(),
+                      d0, d1, d2, d3,
+                      config_.input_element_count[name],
+                      config_.tensor_size[name],
+                      config_.input_fmt_str[name], config_.input_type_str[name], config_.input_qnt_type_str[name], // 如果未来 Config 加了这三个字段，请替换此处
+                      input_zp_str,
+                      input_scale_str);
         }
 
         for (uint16_t i = 0; i < config_.output_tensors_count; i++)
@@ -206,16 +206,16 @@ namespace ai_framework
                 auto output_zp_it = config_.zero_point.find(name);
                 std::string output_zp_str = (output_zp_it != config_.zero_point.end()) ? std::to_string(output_zp_it->second) : "N/A";
                 std::string output_scale_str = (output_scale_it != config_.scale.end()) ? std::to_string(output_scale_it->second) : "N/A";
-                LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
-                         i,
-                         name.c_str(),
-                         shape.size(),
-                         d0, d1, d2, d3, d4,
-                         config_.output_element_count[name],
-                         config_.tensor_size[name],
-                         config_.output_fmt_str[name], config_.output_type_str[name], config_.output_qnt_type_str[name],
-                         output_zp_str,
-                         output_scale_str);
+                LOG_DEBUG("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
+                          i,
+                          name.c_str(),
+                          shape.size(),
+                          d0, d1, d2, d3, d4,
+                          config_.output_element_count[name],
+                          config_.tensor_size[name],
+                          config_.output_fmt_str[name], config_.output_type_str[name], config_.output_qnt_type_str[name],
+                          output_zp_str,
+                          output_scale_str);
             }
             else
             {
@@ -234,20 +234,20 @@ namespace ai_framework
                 auto output_zp_it = config_.zero_point.find(name);
                 std::string output_zp_str = (output_zp_it != config_.zero_point.end()) ? std::to_string(output_zp_it->second) : "N/A";
                 std::string output_scale_str = (output_scale_it != config_.scale.end()) ? std::to_string(output_scale_it->second) : "N/A";
-                LOG_INFO("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
-                         i,
-                         name.c_str(),
-                         shape.size(),
-                         d0, d1, d2, d3,
-                         config_.output_element_count[name],
-                         config_.tensor_size[name],
-                         config_.output_fmt_str[name], config_.output_type_str[name], config_.output_qnt_type_str[name],
-                         output_zp_str,
-                         output_scale_str);
+                LOG_DEBUG("index={}, name={}, n_dims={}, dims=[{}, {}, {}, {}], n_elems={}, size={}, fmt={}, type={}, qnt_type={}, zp={}, scale={}",
+                          i,
+                          name.c_str(),
+                          shape.size(),
+                          d0, d1, d2, d3,
+                          config_.output_element_count[name],
+                          config_.tensor_size[name],
+                          config_.output_fmt_str[name], config_.output_type_str[name], config_.output_qnt_type_str[name],
+                          output_zp_str,
+                          output_scale_str);
             }
         }
 
-        LOG_INFO("==============================");
+        LOG_DEBUG("==============================");
     }
 
 }

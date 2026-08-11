@@ -39,7 +39,7 @@ void drawSkeleton(cv::Mat &img, const std::vector<cv::Point> &points,
     }
 }
 
-void ProcessPoseImage(cv::Mat &image, PostProcess::Result &result,
+void ProcessPoseImage(cv::Mat &image, Result &result,
                       const int target_side_length)
 {
     std::vector<cv::Point> points(17);
@@ -211,7 +211,7 @@ void AddWeightedSegment(cv::Mat &image, const cv::Mat &seg_mat, int id)
 
 cv::Mat GetImageResult(const cv::Mat &original_image,
                        const int target_side_length,
-                       const std::vector<PostProcess::Result> &results,
+                       const std::vector<Result> &results,
                        std::vector<std::string> &labels, bool enable_track)
 {
     auto image = original_image.clone();
@@ -220,7 +220,7 @@ cv::Mat GetImageResult(const cv::Mat &original_image,
     std::vector<Object> objects;
     for (auto result : results)
     {
-        if (result.model_type == PostProcess::ModelType::SEGMENT_V11)
+        if (result.model_type == ModelType::SEGMENT_V11)
         {
             AddWeightedSegment(image, result.seg_mat, result.class_id);
         }
@@ -240,7 +240,7 @@ cv::Mat GetImageResult(const cv::Mat &original_image,
                     result.obj_prob * 100);
             cv::putText(image, text, cv::Point(x1, y1 + 20), cv::FONT_HERSHEY_COMPLEX,
                         0.65, cv::Scalar(255, 255, 0), 1, cv::LINE_8);
-            if (result.model_type == PostProcess::ModelType::POSE_V8)
+            if (result.model_type == ModelType::POSE_V8)
             {
                 ProcessPoseImage(image, result, target_side_length);
             }
@@ -302,7 +302,7 @@ void ShowAndSave(const cv::Mat &image, int cv_wait_ms, bool is_save)
 // std::shared_ptr<FrameBuffer> kFramebuffer;
 
 void ShowResults(const cv::Mat &original_image, const int target_side_length,
-                 const std::vector<PostProcess::Result> &results,
+                 const std::vector<Result> &results,
                  std::vector<std::string> &labels, int cv_wait_ms,
                  bool enable_track, bool is_save, bool hdmi_output,
                  bool cv_show)

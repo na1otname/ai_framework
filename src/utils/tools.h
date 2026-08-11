@@ -1,17 +1,17 @@
 #pragma once
 #include "chrono"
-#include "image_process/detection/detection_postprocess.h"
 #include "opencv2/opencv.hpp"
+#include "types.h"
 
 void ShowResults(const cv::Mat &original_image, const int target_side_length,
-                 const std::vector<PostProcess::Result> &results,
+                 const std::vector<Result> &results,
                  std::vector<std::string> &labels, int cv_wait_ms,
                  bool enable_track = false, bool is_save = false,
                  bool hdmi_output = false, bool cv_show = true);
 void ShowAndSave(const cv::Mat &image, int cv_wait_ms, bool is_save);
 cv::Mat GetImageResult(const cv::Mat &original_image,
                        const int target_side_length,
-                       const std::vector<PostProcess::Result> &results,
+                       const std::vector<Result> &results,
                        std::vector<std::string> &labels,
                        bool enable_track = false);
 

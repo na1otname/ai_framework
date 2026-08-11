@@ -258,7 +258,7 @@ static float CalculateOverlap(float xmin0, float ymin0, float xmax0,
     return u <= 0.f ? 0.f : (i / u);
 }
 
-static int nms(int validCount, std::vector<PostProcess::Bbox> &bboxes,
+static int nms(int validCount, std::vector<Bbox> &bboxes,
                std::vector<int> &order, float threshold)
 {
     for (int i = 0; i < validCount; ++i)
@@ -295,7 +295,7 @@ static int nms(int validCount, std::vector<PostProcess::Bbox> &bboxes,
 }
 
 static int nms(const int validCount,
-               const std::vector<PostProcess::Bbox> &bboxes,
+               const std::vector<Bbox> &bboxes,
                const std::vector<int> classIds, std::vector<int> &order,
                const int filterId, const float threshold)
 {

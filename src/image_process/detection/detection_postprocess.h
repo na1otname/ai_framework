@@ -1,5 +1,6 @@
 #pragma once
 #include "ai_instance.h"
+#include "utils/types.h"
 #include "opencv2/opencv.hpp"
 #include "stdint.h"
 #include <cmath>
@@ -10,45 +11,6 @@ using ai_framework::ModelFormat;
 class PostProcess
 {
 public:
-    enum ModelType : uint16_t
-    {
-        DETECTION_V8 = 0,
-        DETECTION_V10,
-        DETECTION_V11,
-        DETECTION_V13,
-        POSE_V8,
-        SEGMENT_V11,
-        DETECTION_V26,
-        DETECTION_RTMDE
-    };
-    struct Bbox
-    {
-        float x1;
-        float y1;
-        float x2;
-        float y2;
-    };
-    struct KeyPoint
-    {
-        float x;
-        float y;
-        float visibility;
-    };
-    struct Result
-    {
-        ModelType model_type;
-        Bbox box;
-        float obj_prob;
-        int class_id;
-        cv::Mat seg_mat;
-        KeyPoint key_points[17];
-    };
-    typedef struct
-    {
-        int index;
-        int sub_index;
-        int grid_len;
-    } BboxesIdx;
     PostProcess() = delete;
     PostProcess(const ai_framework::Config &config,
                 std::vector<float> &conf_threshold, float sum_conf_threshold,
