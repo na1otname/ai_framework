@@ -22,7 +22,7 @@ int main()
     auto input = engine.get_input_tensor_ptr();
     auto output = engine.get_output_tensor_ptr();
 
-    const char *image_path = "/home/orangepi/Code/ai_framework/source/860874541702.jpg";
+    const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
     cv::Mat frame = cv::imread(image_path);
     PreProcess preprocessor(320, false);
 

@@ -4,7 +4,6 @@
 
 #include "opencv2/opencv.hpp"
 
-
 enum ModelType : uint16_t
 {
     DETECTION_V8 = 0,
@@ -45,3 +44,8 @@ typedef struct
     int grid_len;
 } BboxesIdx;
 
+struct TopdownMeta
+{
+    cv::Point2f center;
+    cv::Size2f scale;
+};

@@ -16,8 +16,8 @@ target_link_libraries(detection_preprocess
 
 add_library(detection_postprocess 
 	detection/detection_postprocess.cpp
-	topdown/topdown_postprocess.h
-	topdown/topdown_postprocess.cpp)
+	topdown/topdown_process.h
+	topdown/topdown_process.cpp)
 target_include_directories(detection_postprocess
 	PUBLIC
 		${OpenCV_INCLUDE_DIRS}

@@ -1,32 +1,34 @@
-#include "detection_preprocess.h"
+#include "topdown_process.h"
 
-#ifdef RK3588
-#include <cstdlib>
-#include <cstring>
-#include <memory>
-#include <vector>
+TopdownProcess::TopdownProcess(int detect_target_side_length,
+                               int keypoint_target_side_length,
+                               bool debug)
+    : detect_target_side_length_(detect_target_side_length),
+      keypoint_target_side_length_(keypoint_target_side_length),
+      debug_(debug)
+{
+}
 
-#include "im2d.hpp"
-#endif
+TopdownProcess::~TopdownProcess()
+{
+}
 
-PreProcess::PreProcess(int target_side_length, bool debug)
-    : target_side_length_(target_side_length), debug_(debug) {}
-
-void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
+// detect letterbox
+void TopdownProcess::PreProcess(const std::vector<cv::Mat> &input, void *tensors[])
 {
     for (size_t i = 0; i < input.size(); ++i)
     {
         auto &original_input = input.at(i);
-        int resize_width = target_side_length_;
-        int resize_height = target_side_length_;
+        int resize_width = detect_target_side_length_;
+        int resize_height = detect_target_side_length_;
         if (original_input.cols >= original_input.rows)
         {
-            float scale = 1.0f * original_input.cols / target_side_length_;
+            float scale = 1.0f * original_input.cols / detect_target_side_length_;
             resize_height = original_input.rows / scale;
         }
         else
         {
-            float scale = 1.0f * original_input.rows / target_side_length_;
+            float scale = 1.0f * original_input.rows / detect_target_side_length_;
             resize_width = original_input.cols / scale;
         }
 #ifdef RK3588
@@ -34,7 +36,7 @@ void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
         // resize + BGR→RGB + 写入左上角区域。全程走 RGA3（有 IOMMU，支持
         // 用户态虚拟地址）；makeBorder 仅 RGA2 支持、且 RGA2 无 IOMMU，故不用。
         const size_t out_size =
-            (size_t)target_side_length_ * target_side_length_ * 3;
+            (size_t)detect_target_side_length_ * detect_target_side_length_ * 3;
         rga_buffer_handle_t src_handle = importbuffer_virtualaddr(
             (void *)original_input.data,
             (int)(original_input.step * original_input.rows));
@@ -42,18 +44,18 @@ void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
             importbuffer_virtualaddr(tensors[i], (int)out_size);
         if (!src_handle || !out_handle)
         {
-            LOG_ERROR(
-                "[PreProcess] importbuffer_virtualaddr failed (src={} "
-                "out={}) tensors[{}]={} out_size={} src_size={}\n",
-                (int)src_handle, (int)out_handle, i, tensors[i], out_size,
-                (int)(original_input.step * original_input.rows));
+            fprintf(stderr,
+                    "[PreProcess] importbuffer_virtualaddr failed (src=%d "
+                    "out=%d) tensors[%zu]=%p out_size=%zu src_size=%d\n",
+                    (int)src_handle, (int)out_handle, i, tensors[i], out_size,
+                    (int)(original_input.step * original_input.rows));
             return;
         }
         rga_buffer_t src_rga = wrapbuffer_handle(
             src_handle, original_input.cols, original_input.rows,
             RK_FORMAT_BGR_888);
         rga_buffer_t out_rga = wrapbuffer_handle(
-            out_handle, target_side_length_, target_side_length_,
+            out_handle, detect_target_side_length_, detect_target_side_length_,
             RK_FORMAT_RGB_888);
 
         // Step 1: 背景填充 RGB(114,114,114)
@@ -72,8 +74,8 @@ void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
                                       drect, im_rect(), -1, nullptr, &opt, 0);
         if (st_proc != IM_STATUS_SUCCESS)
         {
-            LOG_ERROR("[PreProcess] improcess failed, status=%d\n",
-                      (int)st_proc);
+            fprintf(stderr, "[PreProcess] improcess failed, status=%d\n",
+                    (int)st_proc);
             return;
         }
         releasebuffer_handle(src_handle);
@@ -81,7 +83,7 @@ void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
 
         if (debug_)
         {
-            cv::Mat debug_mat(target_side_length_, target_side_length_,
+            cv::Mat debug_mat(detect_target_side_length_, detect_target_side_length_,
                               CV_8UC3, tensors[i]);
             cv::imshow("PreProcess Image", debug_mat);
             cv::waitKey(1);
@@ -102,7 +104,93 @@ void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
     }
 }
 
-void PreProcess::MakeSquare(const cv::Mat &src, cv::Mat &dst)
+void TopdownProcess::CropImageByDetectBox(const std::vector<cv::Mat> &inputs,
+                                          const std::vector<Result> &bboxs,
+                                          void *tensors[])
+{
+    for (size_t i = 0; i < inputs.size(); ++i)
+    {
+        const cv::Mat &image = inputs[i];
+        const Result &bbox = bboxs[i];
+
+        int x1 = static_cast<int>(bbox.box.x1);
+        int y1 = static_cast<int>(bbox.box.y1);
+        int x2 = static_cast<int>(bbox.box.x2);
+        int y2 = static_cast<int>(bbox.box.y2);
+
+        cv::Rect roi(
+            x1,
+            y1,
+            x2 - x1,
+            y2 - y1);
+
+        cv::Mat crop = image(roi);
+    }
+}
+
+cv::Mat TopdownProcess::GetAffineTransform(float center_x,
+                                           float center_y,
+                                           float scale_width,
+                                           float scale_height,
+                                           int output_image_width,
+                                           int output_image_height,
+                                           bool inverse)
+{
+    // solve the affine transformation matrix
+
+    // get the three points corresponding to the source picture and the target picture
+    cv::Point2f src_point_1;
+    src_point_1.x = center_x;
+    src_point_1.y = center_y;
+
+    cv::Point2f src_point_2;
+    src_point_2.x = center_x;
+    src_point_2.y = center_y - scale_width * 0.5;
+
+    cv::Point2f src_point_3;
+    src_point_3.x = src_point_2.x - (src_point_1.y - src_point_2.y);
+    src_point_3.y = src_point_2.y + (src_point_1.x - src_point_2.x);
+
+    float alphapose_image_center_x = output_image_width / 2;
+    float alphapose_image_center_y = output_image_height / 2;
+
+    cv::Point2f dst_point_1;
+    dst_point_1.x = alphapose_image_center_x;
+    dst_point_1.y = alphapose_image_center_y;
+
+    cv::Point2f dst_point_2;
+    dst_point_2.x = alphapose_image_center_x;
+    dst_point_2.y = alphapose_image_center_y - output_image_width * 0.5;
+
+    cv::Point2f dst_point_3;
+    dst_point_3.x = dst_point_2.x - (dst_point_1.y - dst_point_2.y);
+    dst_point_3.y = dst_point_2.y + (dst_point_1.x - dst_point_2.x);
+
+    cv::Point2f srcPoints[3];
+    srcPoints[0] = src_point_1;
+    srcPoints[1] = src_point_2;
+    srcPoints[2] = src_point_3;
+
+    cv::Point2f dstPoints[3];
+    dstPoints[0] = dst_point_1;
+    dstPoints[1] = dst_point_2;
+    dstPoints[2] = dst_point_3;
+
+    // get affine matrix
+    cv::Mat affineTransform;
+    if (inverse)
+    {
+        affineTransform = cv::getAffineTransform(dstPoints, srcPoints);
+    }
+    else
+    {
+        affineTransform = cv::getAffineTransform(srcPoints, dstPoints);
+    }
+
+    return affineTransform;
+}
+
+void TopdownProcess::MakeSquare(const cv::Mat &src, cv::Mat &dst)
 {
     // 获取图像的宽和高
     int width = src.cols;
@@ -129,7 +217,7 @@ void PreProcess::MakeSquare(const cv::Mat &src, cv::Mat &dst)
                        cv::Scalar(114, 114, 114));
 }
 
-uint64_t PreProcess::PopulateData(
+uint64_t TopdownProcess::PopulateData(
     const cv::Mat &data,
     float *dst,
     const std::vector<float> &mean,

@@ -349,7 +349,7 @@ bool Rk3588::QueryAndConfigureRuntime()
             config_.zero_point[name] = output_attr_[i].zp;
         }
         config_.tensor_size[name] = output_attr_[i].size_with_stride;
-        ;
+    
         // config_.width_equal_stride[name] = (output_attr_[i].w_stride == (uint32_t)output_attr_[i].dims[2]);
         // config_.stride[name] = output_attr_[i].w_stride;
 
