@@ -18,6 +18,9 @@ add_library(detection_postprocess
 	detection/detection_postprocess.cpp
 	topdown/topdown_process.h
 	topdown/topdown_process.cpp)
+# topdown 预处理在 RK3588 平台走 RGA，需要 RK3588 宏
+# （与 detection_preprocess 保持一致）
+target_compile_definitions(detection_postprocess PRIVATE RK3588=1)
 target_include_directories(detection_postprocess
 	PUBLIC
 		${OpenCV_INCLUDE_DIRS}

@@ -7,7 +7,7 @@ add_subdirectory(image_process)
 
 
 target_include_directories(${PROJECT_NAME} PUBLIC
-    ${IMAGE_PROCESS_DIR}/detection
+    ${IMAGE_PROCESS_DIR}
     ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC     
