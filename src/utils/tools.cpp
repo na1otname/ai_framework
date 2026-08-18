@@ -350,3 +350,227 @@ double get_current_time()
     auto duration = now.time_since_epoch();
     return std::chrono::duration<double>(duration).count();
 }
+
+bool ContainsSubString(const std::string &str,
+                       const std::string &substring)
+{
+    return str.find(substring) != std::string::npos;
+}
+
+inline int32_t __clip(float val, float min, float max)
+{
+    float f = val <= min ? min : (val >= max ? max : val);
+    return f;
+}
+
+template <typename T>
+T sigmoid(T x)
+{
+    return static_cast<T>(1) / (static_cast<T>(1) + std::exp(-x));
+}
+
+int8_t qnt_f32_to_affine(float f32, int32_t zp, float scale)
+{
+    float dst_val = (f32 / scale) + zp;
+    int8_t res = (int8_t)__clip(dst_val, -128, 127);
+    return res;
+}
+
+float deqnt_affine_to_f32(int8_t qnt, int32_t zp, float scale)
+{
+    return ((float)qnt - (float)zp) * scale;
+}
+
+// RKNN 非对称量化：zp>0 的层（如 RTMDet 的 score/cls 层）实际以 uint8 存储，
+// 必须按 (u8 - zp) × scale 反量化，否则高分字节会被误读成负数 int8。
+float deqnt_affine_u8_to_f32(uint8_t qnt, int32_t zp, float scale)
+{
+    return ((float)qnt - (float)zp) * scale;
+}
+
+void compute_dfl(float *tensor, int dfl_len, float *box)
+{
+    for (int b = 0; b < 4; b++)
+    {
+        float exp_t[dfl_len];
+        float exp_sum = 0;
+        float acc_sum = 0;
+        for (int i = 0; i < dfl_len; i++)
+        {
+            exp_t[i] = exp(tensor[i + b * dfl_len]);
+            exp_sum += exp_t[i];
+        }
+
+        for (int i = 0; i < dfl_len; i++)
+        {
+            acc_sum += exp_t[i] / exp_sum * i;
+        }
+        box[b] = acc_sum;
+    }
+}
+
+// IEEE 754 half-precision (float16) → float32 转换
+float fp16_to_f32(uint16_t half)
+{
+    // 提取符号、指数、尾数
+    uint32_t sign = (half & 0x8000u) << 16;
+    uint32_t exp = (half >> 10) & 0x1fu;
+    uint32_t mant = half & 0x3ffu;
+
+    uint32_t f32;
+    if (exp == 0)
+    {
+        // 零 / 次正规数
+        if (mant == 0)
+        {
+            f32 = sign; // +/-0
+        }
+        else
+        {
+            // 次正规数 → 正规化
+            while ((mant & 0x400u) == 0)
+            {
+                mant <<= 1;
+                exp--;
+            }
+            mant &= 0x3ffu;
+            exp = 1 + (127 - 15);
+            f32 = sign | (exp << 23) | (mant << 13);
+        }
+    }
+    else if (exp == 0x1f)
+    {
+        // Inf / NaN
+        f32 = sign | (0xffu << 23) | (mant << 13);
+    }
+    else
+    {
+        // 正规数
+        exp = exp + (127 - 15);
+        f32 = sign | (exp << 23) | (mant << 13);
+    }
+
+    float result;
+    memcpy(&result, &f32, sizeof(float));
+    return result;
+}
+
+int quick_sort_indice_inverse(std::vector<float> &input, int left,
+                              int right, std::vector<int> &indices)
+{
+    float key;
+    int key_index;
+    int low = left;
+    int high = right;
+    if (left < right)
+    {
+        key_index = indices[left];
+        key = input[left];
+        while (low < high)
+        {
+            while (low < high && input[high] <= key)
+            {
+                high--;
+            }
+            input[low] = input[high];
+            indices[low] = indices[high];
+            while (low < high && input[low] >= key)
+            {
+                low++;
+            }
+            input[high] = input[low];
+            indices[high] = indices[low];
+        }
+        input[low] = key;
+        indices[low] = key_index;
+        quick_sort_indice_inverse(input, left, low - 1, indices);
+        quick_sort_indice_inverse(input, low + 1, right, indices);
+    }
+    return low;
+}
+
+float CalculateOverlap(float xmin0, float ymin0, float xmax0,
+                       float ymax0, float xmin1, float ymin1,
+                       float xmax1, float ymax1)
+{
+    float w = fmax(0.f, fmin(xmax0, xmax1) - fmax(xmin0, xmin1) + 1.0);
+    float h = fmax(0.f, fmin(ymax0, ymax1) - fmax(ymin0, ymin1) + 1.0);
+    float i = w * h;
+    float u = (xmax0 - xmin0 + 1.0) * (ymax0 - ymin0 + 1.0) +
+              (xmax1 - xmin1 + 1.0) * (ymax1 - ymin1 + 1.0) - i;
+    return u <= 0.f ? 0.f : (i / u);
+}
+
+int nms(int validCount, std::vector<Bbox> &bboxes,
+        std::vector<int> &order, float threshold)
+{
+    for (int i = 0; i < validCount; ++i)
+    {
+        if (order[i] == -1)
+        {
+            continue;
+        }
+        int n = order[i];
+        for (int j = i + 1; j < validCount; ++j)
+        {
+            int m = order[j];
+            if (m == -1)
+            {
+                continue;
+            }
+            float xmin0 = bboxes.at(n).x1;
+            float ymin0 = bboxes.at(n).y1;
+            float xmax0 = bboxes.at(n).x2;
+            float ymax0 = bboxes.at(n).y2;
+            float xmin1 = bboxes.at(m).x1;
+            float ymin1 = bboxes.at(m).y1;
+            float xmax1 = bboxes.at(m).x2;
+            float ymax1 = bboxes.at(m).y2;
+            float iou = CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1,
+                                         xmax1, ymax1);
+            if (iou > threshold)
+            {
+                order[j] = -1;
+            }
+        }
+    }
+    return 0;
+}
+
+int nms(const int validCount,
+        const std::vector<Bbox> &bboxes,
+        const std::vector<int> classIds, std::vector<int> &order,
+        const int filterId, const float threshold)
+{
+    for (int i = 0; i < validCount; ++i)
+    {
+        if (order[i] == -1 || classIds[order[i]] != filterId)
+        {
+            continue;
+        }
+        int n = order[i];
+        for (int j = i + 1; j < validCount; ++j)
+        {
+            int m = order[j];
+            if (m == -1 || classIds[order[j]] != filterId)
+            {
+                continue;
+            }
+            float xmin0 = bboxes.at(n).x1;
+            float ymin0 = bboxes.at(n).y1;
+            float xmax0 = bboxes.at(n).x2;
+            float ymax0 = bboxes.at(n).y2;
+            float xmin1 = bboxes.at(m).x1;
+            float ymin1 = bboxes.at(m).y1;
+            float xmax1 = bboxes.at(m).x2;
+            float ymax1 = bboxes.at(m).y2;
+            float iou = CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1,
+                                         xmax1, ymax1);
+            if (iou > threshold)
+            {
+                order[j] = -1;
+            }
+        }
+    }
+    return 0;
+}

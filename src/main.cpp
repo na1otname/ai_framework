@@ -19,12 +19,17 @@ int main(int, char **)
         "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320_static_int8.rknn";
     const char *keypoint_model_path = "/home/orangepi/Code/ai_framework/model/rtmpose-m_8xb256_hand_finetune-fp16.rknn";
 
-    
-    const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
+        const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
 
     cv::Mat frame = cv::imread(image_path);
 
-    std::shared_ptr<TopdownProcess> topdownprocess_ptr_ = std::make_unique<TopdownProcess>();
+    ai_framework::Engine detect_engine(ai_framework::RKNN_FORMAT, detect_model_path);
+    ai_framework::Engine keypoint_engine(ai_framework::RKNN_FORMAT, keypoint_model_path);
+
+    std::shared_ptr<TopdownProcess> topdownprocess_ptr_ =
+        std::make_shared<TopdownProcess>(detect_engine.get_config(),
+                                         keypoint_engine.get_config(),
+                                         0.4f, 0.4f, false);
 
     // topdownprocess_ptr_->
     return 0;

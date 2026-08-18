@@ -13,7 +13,8 @@ enum ModelType : uint16_t
     POSE_V8,
     SEGMENT_V11,
     DETECTION_V26,
-    DETECTION_RTMDE
+    DETECTION_RTMDE,
+    POSE_RTMPOSE
 };
 struct Bbox
 {
