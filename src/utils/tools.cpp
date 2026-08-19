@@ -363,12 +363,6 @@ inline int32_t __clip(float val, float min, float max)
     return f;
 }
 
-template <typename T>
-T sigmoid(T x)
-{
-    return static_cast<T>(1) / (static_cast<T>(1) + std::exp(-x));
-}
-
 int8_t qnt_f32_to_affine(float f32, int32_t zp, float scale)
 {
     float dst_val = (f32 / scale) + zp;

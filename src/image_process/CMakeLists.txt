@@ -17,7 +17,8 @@ target_link_libraries(detection_preprocess
 add_library(detection_postprocess 
 	detection/detection_postprocess.cpp
 	topdown/topdown_process.h
-	topdown/topdown_process.cpp)
+	topdown/topdown_process.cpp
+	${UTILS})
 # topdown 预处理在 RK3588 平台走 RGA，需要 RK3588 宏
 # （与 detection_preprocess 保持一致）
 target_compile_definitions(detection_postprocess PRIVATE RK3588=1)

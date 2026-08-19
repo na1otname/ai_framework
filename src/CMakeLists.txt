@@ -14,6 +14,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     engine
     ${RKNN_API_LIB_PATH}
     ${RGA_API_LIB_PATH}
+    	${UTILS}
     spdlog
     fmt
     systemd

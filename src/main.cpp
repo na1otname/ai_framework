@@ -19,17 +19,40 @@ int main(int, char **)
         "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320_static_int8.rknn";
     const char *keypoint_model_path = "/home/orangepi/Code/ai_framework/model/rtmpose-m_8xb256_hand_finetune-fp16.rknn";
 
-        const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
+    const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
 
     cv::Mat frame = cv::imread(image_path);
 
-    ai_framework::Engine detect_engine(ai_framework::RKNN_FORMAT, detect_model_path);
-    ai_framework::Engine keypoint_engine(ai_framework::RKNN_FORMAT, keypoint_model_path);
+    std::shared_ptr<ai_framework::Engine> detect_engine =
+        std::make_shared<ai_framework::Engine>(ai_framework::RKNN_FORMAT, detect_model_path);
+    std::shared_ptr<ai_framework::Engine> keypoint_engine =
+        std::make_shared<ai_framework::Engine>(ai_framework::RKNN_FORMAT, keypoint_model_path);
 
     std::shared_ptr<TopdownProcess> topdownprocess_ptr_ =
-        std::make_shared<TopdownProcess>(detect_engine.get_config(),
-                                         keypoint_engine.get_config(),
+        std::make_shared<TopdownProcess>(detect_engine->get_config(),
+                                         keypoint_engine->get_config(),
                                          0.4f, 0.4f, false);
+    auto input_det_ptr = detect_engine->get_input_tensor_ptr();
+    auto output_det_ptr = detect_engine->get_output_tensor_ptr();
+
+    auto input_keypoint_ptr = keypoint_engine->get_input_tensor_ptr();
+    auto output_keypoint_prt = keypoint_engine->get_output_tensor_ptr();
+
+    topdownprocess_ptr_->PreProcess({frame}, input_det_ptr);
+    topdownprocess_ptr_->PostProcessDetect(output_det_ptr);
+
+    std::vector<Result> result_ = topdownprocess_ptr_->get_result();
+    std::vector<TopdownMeta> meta_info;
+    topdownprocess_ptr_->CropImageByDetectBox({frame}, result_, input_keypoint_ptr, meta_info);
+    topdownprocess_ptr_->PostProcessRTMPose(output_keypoint_prt, meta_info);
+
+    std::vector<Result> result_ = topdownprocess_ptr_->get_result();
+
+    std::vector<std::string> labels = {"hand"};
+    // 无显示环境下直接保存标注结果图（避免 cv::imshow 的 GTK 后端初始化失败）
+    cv::Mat annotated =
+        GetImageResult(frame, topdownprocess_ptr_->get_target_side_length(), result_, labels);
+    cv::imwrite("/home/orangepi/Code/ai_framework/source/result.jpg", annotated);
 
     // topdownprocess_ptr_->
     return 0;

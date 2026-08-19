@@ -1,5 +1,6 @@
 #pragma once
 #include "chrono"
+#include "cmath"
 #include "opencv2/opencv.hpp"
 #include "types.h"
 
@@ -28,7 +29,10 @@ bool ContainsSubString(const std::string &str, const std::string &substring);
 inline int32_t __clip(float val, float min, float max);
 
 template <typename T>
-T sigmoid(T x);
+T sigmoid(T x)
+{
+        return static_cast<T>(1) / (static_cast<T>(1) + std::exp(-x));
+}
 
 int8_t qnt_f32_to_affine(float f32, int32_t zp, float scale);
 
