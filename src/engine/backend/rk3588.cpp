@@ -111,11 +111,8 @@ Rk3588::~Rk3588()
         free(output_tmp_attr_);
         output_tmp_attr_ = nullptr;
     }
-    if (tensor_data_ptr_)
-    {
-        free(tensor_data_ptr_);
-        tensor_data_ptr_ = nullptr;
-    }
+    // tensor_data_ptr_ 是借用指针，不拥有其生命周期。
+    tensor_data_ptr_ = nullptr;
     if (ctx_ != 0)
     {
         rknn_destroy(ctx_);
@@ -349,7 +346,7 @@ bool Rk3588::QueryAndConfigureRuntime()
             config_.zero_point[name] = output_attr_[i].zp;
         }
         config_.tensor_size[name] = output_attr_[i].size_with_stride;
-    
+
         // config_.width_equal_stride[name] = (output_attr_[i].w_stride == (uint32_t)output_attr_[i].dims[2]);
         // config_.stride[name] = output_attr_[i].w_stride;
 

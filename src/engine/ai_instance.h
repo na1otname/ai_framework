@@ -71,7 +71,7 @@ namespace ai_framework
     public:
         using Ptr = std::shared_ptr<Engine>;
         Engine() = delete;
-        Engine(const enum ModelFormat format, const char *model_path);
+        Engine(const char *model_path);
         void **&get_input_tensor_ptr();
         void **&get_output_tensor_ptr();
         const int get_input_tensor_count();
@@ -96,7 +96,6 @@ namespace ai_framework
         AiInstancePtr instance_ptr_;
         TensorDataPtr tensor_data_ptr_;
     };
-    AiInstancePtr CreateBackend(ModelFormat format);
 } // namespace ai_framework
 
 #endif // AI_FRAMEWORK_COMMON_AI_INSTANCE_H_

@@ -7,20 +7,10 @@
 void CoordinateTransformation(float &x, float &y, int width, int height,
                               int target_side_length)
 {
-    if (width > height)
-    {
-        int padding = (width - height) >> 1;
-        float scale = 1.0f * target_side_length / width;
-        y = std::max<float>(y / scale - padding, 0);
-        x = std::max<float>(x / scale, 0);
-    }
-    else
-    {
-        int padding = (height - width) >> 1;
-        float scale = 1.0f * target_side_length / height;
-        x = std::max<float>(x / scale - padding, 0);
-        y = std::max<float>(y / scale, 0);
-    }
+    // Detection preprocessing resizes to the top-left of the square input.
+    const float scale = 1.0f * target_side_length / std::max(width, height);
+    x = std::max<float>(x / scale, 0);
+    y = std::max<float>(y / scale, 0);
 }
 
 void drawSkeleton(cv::Mat &img, const std::vector<cv::Point> &points,
@@ -229,6 +219,8 @@ cv::Mat GetImageResult(const cv::Mat &original_image,
         y1 = std::max<float>(result.box.y1, 0);
         x2 = std::max<float>(result.box.x2, 0);
         y2 = std::max<float>(result.box.y2, 0);
+        CoordinateTransformation(x1, y1, width, height, target_side_length);
+        CoordinateTransformation(x2, y2, width, height, target_side_length);
         if (!enable_track)
         {
             cv::rectangle(image, cv::Point(x1, y1), cv::Point(x2, y2),

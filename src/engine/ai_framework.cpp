@@ -138,6 +138,34 @@ namespace ai_framework
 #endif
 
 #ifdef RK3588
+        // TensorData 的生命周期早于 Engine 内的 Rk3588 backend 结束，
+        // 因此这里仍可使用有效的 RKNN context 释放零拷贝内存。
+        if (rknn_zero_copy_ && rknn_ctx_ != 0)
+        {
+            if (input_rknn_tensor_mem_ptr_ != nullptr)
+            {
+                for (uint16_t i = 0; i < input_tensor_count_; ++i)
+                {
+                    if (input_rknn_tensor_mem_ptr_[i] != nullptr)
+                    {
+                        rknn_destroy_mem(rknn_ctx_, input_rknn_tensor_mem_ptr_[i]);
+                        input_rknn_tensor_mem_ptr_[i] = nullptr;
+                    }
+                }
+            }
+            if (output_rknn_tensor_mem_ptr_ != nullptr)
+            {
+                for (uint16_t i = 0; i < output_tensor_count_; ++i)
+                {
+                    if (output_rknn_tensor_mem_ptr_[i] != nullptr)
+                    {
+                        rknn_destroy_mem(rknn_ctx_, output_rknn_tensor_mem_ptr_[i]);
+                        output_rknn_tensor_mem_ptr_[i] = nullptr;
+                    }
+                }
+            }
+        }
+
         // 释放 RKNN 内存指针数组
         if (input_rknn_tensor_mem_ptr_ != nullptr)
         {

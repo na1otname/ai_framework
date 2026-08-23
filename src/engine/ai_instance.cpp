@@ -6,32 +6,25 @@
 
 namespace ai_framework
 {
-    AiInstancePtr CreateBackend(ModelFormat format)
+   
+    Engine::Engine( const char *model_path)
     {
-        switch (format)
-        {
+
 #ifdef RK3588
-        case RKNN_FORMAT:
-            return std::make_shared<Rk3588>();
+
+       instance_ptr_ =std::make_shared<Rk3588>();
 #endif
 
 #ifdef ONNXRUNTIME
-        case ONNX_FORMAT:
-            return std::make_shared<OnnxRuntime>();
+
+        instance_ptr_ =std::make_shared<OnnxRuntime>();
 #endif
 
 #ifdef TRT
-        case TRT_FORMAT:
-            return std::make_shared<TensorRT>();
+       instance_ptr_ =std::make_shared<TensorRT>();
 #endif
-        default:
-            return nullptr;
-        }
-    }
 
-    Engine::Engine(const enum ModelFormat format, const char *model_path)
-    {
-        instance_ptr_ = CreateBackend(format);
+        // instance_ptr_ = CreateBackend(format);
 
         if (instance_ptr_ == nullptr)
         {

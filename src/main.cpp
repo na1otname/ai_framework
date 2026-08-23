@@ -19,14 +19,14 @@ int main(int, char **)
         "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320_static_int8.rknn";
     const char *keypoint_model_path = "/home/orangepi/Code/ai_framework/model/rtmpose-m_8xb256_hand_finetune-fp16.rknn";
 
-    const char *image_path = "/home/orangepi/Code/ai_framework/source/test_2.jpg";
+    const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
 
     cv::Mat frame = cv::imread(image_path);
 
-    std::shared_ptr<ai_framework::Engine> detect_engine =
-        std::make_shared<ai_framework::Engine>(ai_framework::RKNN_FORMAT, detect_model_path);
-    std::shared_ptr<ai_framework::Engine> keypoint_engine =
-        std::make_unique<ai_framework::Engine>(ai_framework::RKNN_FORMAT, keypoint_model_path);
+    std::unique_ptr<ai_framework::Engine> detect_engine =
+        std::make_unique<ai_framework::Engine>(detect_model_path);
+    std::unique_ptr<ai_framework::Engine> keypoint_engine =
+        std::make_unique<ai_framework::Engine>(keypoint_model_path);
 
     std::shared_ptr<TopdownProcess> topdownprocess_ptr_ =
         std::make_shared<TopdownProcess>(detect_engine->get_config(),
@@ -55,8 +55,8 @@ int main(int, char **)
     std::vector<std::string> labels = {"hand"};
     // 无显示环境下直接保存标注结果图（避免 cv::imshow 的 GTK 后端初始化失败）
     cv::Mat frame_result = GetImageResult(frame, result_, labels);
-    cv::imshow("test", frame_result);
-    cv::waitKey(0);
+    // cv::imshow("test", frame_result);
+    // cv::waitKey(0);
     // cv::imwrite("/home/orangepi/Code/ai_framework/source/result.jpg", frame_result);
 
     // topdownprocess_ptr_->

@@ -15,16 +15,16 @@ int main()
 {
     // === 1. 加载模型（Rk3588 → TensorData → BindInputAndOutput） ===
     const char *model_path =
-        "/home/orangepi/Code/ai_framework/model/rtmpose-m_8xb256_hand-fintune-256x256-int8_pow.rknn";
+        "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320_static_int8.rknn";
     printf("[1/6] Loading model: %s\n", model_path);
-    auto engine = ai_framework::Engine(ai_framework::RKNN_FORMAT, model_path);
+    auto engine = ai_framework::Engine(model_path);
 
     auto input = engine.get_input_tensor_ptr();
     auto output = engine.get_output_tensor_ptr();
 
     const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
     cv::Mat frame = cv::imread(image_path);
-    PreProcess preprocessor(256, false);
+    PreProcess preprocessor(320, false);
 
     preprocessor.Run({frame}, input);
     std::vector<float> conf_threshold = {0.4f};
