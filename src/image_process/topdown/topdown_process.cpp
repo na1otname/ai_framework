@@ -170,6 +170,11 @@ void TopdownProcess::PreProcess(const std::vector<cv::Mat> &input, void *tensors
             float scale = 1.0f * original_input.rows / detect_input_width_;
             resize_width = original_input.cols / scale;
         }
+        // 记录 letterbox 缩放因子（实际 resize 后宽 / 原图宽，等比缩放），
+        // 供后处理把检测框从模型输入坐标系反算回原图坐标。
+        // 内容为左上角对齐（无平移偏移），反算只需除以该缩放因子。
+        detect_letterbox_scale_ =
+            1.0f * resize_width / original_input.cols;
 #ifdef RK3588
         // RGA3 版本：imfill 填充背景 114（RGB 灰），improcess 一次性完成
         // resize + BGR→RGB + 写入左上角区域。全程走 RGA3（有 IOMMU，支持
@@ -255,18 +260,32 @@ void TopdownProcess::CropImageByDetectBox(const std::vector<cv::Mat> &inputs,
     // 检测框外扩系数
     const float bbox_scale = 1.2f;
 
+    // 防御：检测框数量必须覆盖每个输入图，否则 bboxs[i] 越界读
+    if (inputs.empty() || bboxs.size() < inputs.size())
+    {
+        LOG_WARN("CropImageByDetectBox: invalid bboxs/inputs size (bboxs={}, inputs={})",
+                 bboxs.size(), inputs.size());
+        return;
+    }
+    // 防御：调用方可能传入空 metainfo，先按输入图数量扩容，
+    // 否则后面 metainfo[i].center 会对空 vector 越界写（破坏堆）
+    if (metainfo.size() < inputs.size())
+    {
+        metainfo.resize(inputs.size());
+    }
+
     for (size_t i = 0; i < inputs.size(); ++i)
     {
-        const cv::Mat &image = inputs[i];
+        // const cv::Mat &image = inputs[i];
         const Result &bbox = bboxs[i];
 
         // 把检测框限制在图像范围内，避免越界
         int x1 = std::max(0, static_cast<int>(bbox.box.x1));
         int y1 = std::max(0, static_cast<int>(bbox.box.y1));
-        int x2 = std::min(image.cols, static_cast<int>(bbox.box.x2));
-        int y2 = std::min(image.rows, static_cast<int>(bbox.box.y2));
-        x1 = std::min(x1, image.cols - 1);
-        y1 = std::min(y1, image.rows - 1);
+        int x2 = std::min(inputs[i].cols, static_cast<int>(bbox.box.x2));
+        int y2 = std::min(inputs[i].rows, static_cast<int>(bbox.box.y2));
+        x1 = std::min(x1, inputs[i].cols - 1);
+        y1 = std::min(y1, inputs[i].rows - 1);
         x2 = std::max(x2, x1 + 1);
         y2 = std::max(y2, y1 + 1);
 
@@ -301,87 +320,30 @@ void TopdownProcess::CropImageByDetectBox(const std::vector<cv::Mat> &inputs,
         metainfo[i].scale = cv::Size2f(scale_image_width, scale_image_height);
 
 #ifdef RK3588
-        // ---- RK3588：用 RGA 完成仿射变换 ----
-        // RGA 无任意角度仿射 API，但 RTMPose 的 GetAffineTransform 在 rot=0 时
-        // 退化为"等比缩放 + 平移"（s = out_w / scale_w），源矩形 scale_w×scale_h
-        // 映射到整个输出，可用 improcess 的 srect + drect 精确表达。
-        // 源矩形可能越界（框靠近图像边缘），先裁剪到图像内，并同步换算 drect。
-        cv::Mat image_contig;
-        if (image.isContinuous())
-        {
-            image_contig = image;
-        }
-        else
-        {
-            image_contig = image.clone();
-        }
-
-        const size_t tensor_bytes = (size_t)out_w * out_h * 3;
-        rga_buffer_handle_t src_handle = importbuffer_virtualaddr(
-            (void *)image_contig.data,
-            (int)(image_contig.step * image_contig.rows));
-        rga_buffer_handle_t out_handle =
-            importbuffer_virtualaddr(tensors[i], (int)tensor_bytes);
-        if (!src_handle || !out_handle)
-        {
-            fprintf(stderr,
-                    "[CropImageByDetectBox] importbuffer_virtualaddr failed "
-                    "(src=%d out=%d) tensors[%zu]=%p tensor_bytes=%zu\n",
-                    (int)src_handle, (int)out_handle, i, tensors[i],
-                    tensor_bytes);
-            return;
-        }
-        rga_buffer_t src_rga = wrapbuffer_handle(
-            src_handle, image_contig.cols, image_contig.rows,
-            RK_FORMAT_BGR_888);
-        rga_buffer_t out_rga = wrapbuffer_handle(
-            out_handle, out_w, out_h, RK_FORMAT_RGB_888);
-
-        // Step 1: 背景填充 RGB(114,114,114)。imfill 在 RGA3 不可用，用 CPU memset。
-        memset(tensors[i], 114, tensor_bytes);
-
-        // Step 2: 源矩形（仿射的源区域）裁剪到图像内，drect 按统一缩放 s 换算。
-        const float s = static_cast<float>(out_w) / scale_image_width;
-        const float src_x0 = center_x - scale_image_width * 0.5f;
-        const float src_y0 = center_y - scale_image_height * 0.5f;
-        const int sx = std::max(0, static_cast<int>(std::lround(src_x0)));
-        const int sy = std::max(0, static_cast<int>(std::lround(src_y0)));
-        const int sw = std::min(static_cast<int>(std::lround(scale_image_width)),
-                                image_contig.cols - sx);
-        const int sh = std::min(static_cast<int>(std::lround(scale_image_height)),
-                                image_contig.rows - sy);
-        const int dx = std::max(0, static_cast<int>(std::lround((sx - src_x0) * s)));
-        const int dy = std::max(0, static_cast<int>(std::lround((sy - src_y0) * s)));
-        const int dw = std::min(static_cast<int>(std::lround(sw * s)), out_w - dx);
-        const int dh = std::min(static_cast<int>(std::lround(sh * s)), out_h - dy);
-
-        im_rect srect = {sx, sy, sw, sh};
-        im_rect drect = {dx, dy, dw, dh};
-
-        im_opt_t opt = {};
-        opt.core = IM_SCHEDULER_RGA3_CORE0; // 强制走 RGA3（有 IOMMU）
-        IM_STATUS st = improcess(src_rga, out_rga, rga_buffer_t(), srect,
-                                 drect, im_rect(), -1, nullptr, &opt, 0);
-        if (st != IM_STATUS_SUCCESS)
-        {
-            fprintf(stderr,
-                    "[CropImageByDetectBox] improcess failed, status=%d\n",
-                    (int)st);
-        }
-        releasebuffer_handle(src_handle);
-        releasebuffer_handle(out_handle);
-
+        // ---- RK3588：改用 OpenCV warpAffine 完成仿射变换（与 mmpose RTMPose-Deploy 一致）。
+        // 之前用 RGA improcess：srect 填的是原图坐标，而 image_contig 是 ROI 局部坐标，
+        // 坐标系错位导致 srect 越界、improcess 失败，输出只剩背景 114（纯灰）。
+        // RGA 也无任意角度仿射 API，统一走 OpenCV 最稳妥。
+        // 注意：RKNN 输入为 uint8 NHWC RGB，warpAffine 得到 BGR，需转 RGB 后直接拷贝，
+        // 不能走 PopulateData（那是 float CHW，与 RKNN 输入类型不匹配）。
+        cv::Mat bgr_dst;
+        cv::warpAffine(inputs[i], bgr_dst, affine, cv::Size(out_w, out_h),
+                       cv::INTER_LINEAR, cv::BORDER_CONSTANT,
+                       cv::Scalar(114, 114, 114));
+        cv::Mat rgb_dst;
+        cv::cvtColor(bgr_dst, rgb_dst, cv::COLOR_BGR2RGB);
+        std::memcpy(tensors[i], rgb_dst.data, (size_t)out_w * out_h * 3);
         if (debug_)
         {
-            // tensors[i] 为 RGB 顺序，imshow 按 BGR 解释，仅作调试参考
-            cv::Mat debug_mat(out_h, out_w, CV_8UC3, tensors[i]);
-            cv::imshow("CropImageByDetectBox Image", debug_mat);
+            // cv::imwrite("/home/orangepi/Code/ai_framework/source/result_test.jpg", bgr_dst);
+            // 无显示环境下请注释下面两行（GTK 后端初始化可能触发 SIGABRT）
+            cv::imshow("CropImageByDetectBox Image", bgr_dst);
             cv::waitKey(1);
         }
 #else
         // ---- 非 RK3588：OpenCV warpAffine（与 mmpose RTMPose-Deploy 一致） ----
         cv::Mat dst;
-        cv::warpAffine(image, dst, affine, cv::Size(out_w, out_h),
+        cv::warpAffine(inputs[i], dst, affine, cv::Size(out_w, out_h),
                        cv::INTER_LINEAR, cv::BORDER_CONSTANT,
                        cv::Scalar(114, 114, 114));
         PopulateData(dst, reinterpret_cast<float *>(tensors[i]));
@@ -572,7 +534,6 @@ void TopdownProcess::PostProcessRTMPose(void **&tensors, std::vector<TopdownMeta
 
     const bool is_qnt = !keypoints_zero_points_.empty();
 
-    Result tmp_;
     // 统一把某个 simcc 值解码成 float，避免三元表达式两侧指针类型不一致
     auto read_value = [&](int layer, const float *f32, const uint8_t *i8,
                           const uint16_t *f16, int offset) -> float
@@ -594,62 +555,75 @@ void TopdownProcess::PostProcessRTMPose(void **&tensors, std::vector<TopdownMeta
         return 0.0f; // 枚举已全覆盖，仅为消除“非所有路径返回”告警
     };
 
-    for (int i = 0; i < joint_num; ++i)
+    // 把关键点追加到每个检测结果上：result_ 与 metainfo 一一对应
+    // （CropImageByDetectBox 按 result_ 顺序填充 metainfo）。
+    // 注意不能 push_back 新的空 Result（box/class_id 未初始化，会破坏后续绘制）。
+    const size_t num_boxes = std::min(metainfo.size(), result_.size());
+    const float out_w = static_cast<float>(keypoint_input_width_);
+    const float out_h = static_cast<float>(keypoint_input_height_);
+
+    for (size_t b = 0; b < num_boxes; ++b)
     {
-        // x 方向：在 simcc_x 第 i 个关节的 extend_width 个值里找最大值
-        int max_x_pos = 0;
-        float score_x = read_value(0, simcc_x_f32, simcc_x_int8, simcc_x_fp16,
-                                   i * extend_width);
-        for (int j = 1; j < extend_width; ++j)
-        {
-            float v = read_value(0, simcc_x_f32, simcc_x_int8, simcc_x_fp16,
-                                 i * extend_width + j);
-            if (v > score_x)
-            {
-                score_x = v;
-                max_x_pos = j;
-            }
-        }
+        Result &res = result_[b];
+        res.key_points.clear();
+        res.key_points.reserve(joint_num);
+        // 标记为姿态结果，GetImageResult 据此绘制关键点
+        res.model_type = ModelType::POSE_RTMPOSE;
 
-        // y 方向：在 simcc_y 第 i 个关节的 extend_height 个值里找最大值
-        int max_y_pos = 0;
-        float score_y = read_value(1, simcc_y_f32, simcc_y_int8, simcc_y_fp16,
-                                   i * extend_height);
-        for (int j = 1; j < extend_height; ++j)
-        {
-            float v = read_value(1, simcc_y_f32, simcc_y_int8, simcc_y_fp16,
-                                 i * extend_height + j);
-            if (v > score_y)
-            {
-                score_y = v;
-                max_y_pos = j;
-            }
-        }
-
-        // simcc 编码步长为 2，除以 2 得到模型输入坐标系下的像素坐标
-        int pose_x = max_x_pos / 2;
-        int pose_y = max_y_pos / 2;
-        const float score = (score_x + score_y) * 0.5;
-
-        // 反向仿射：把模型输入坐标 (pose_x, pose_y) 映射回原图。
+        // 反向仿射：把模型输入坐标映射回原图。
         // GetAffineTransform 的正向是均匀缩放 s = scale.width / input_w，
         // 逆向 = (coord - input/2) * scale.width / input_w + center。
-        const float out_w = static_cast<float>(keypoint_input_width_);
-        const float out_h = static_cast<float>(keypoint_input_height_);
-        const float inv_scale = metainfo[i].scale.width / out_w;
+        const float inv_scale = metainfo[b].scale.width / out_w;
+        const float center_x = metainfo[b].center.x;
+        const float center_y = metainfo[b].center.y;
 
-        KeyPoint pose_;
-        pose_.x = (static_cast<float>(pose_x) - out_w * 0.5f) * inv_scale +
-                  metainfo[i].center.x;
-        pose_.y = (static_cast<float>(pose_y) - out_h * 0.5f) * inv_scale +
-                  metainfo[i].center.y;
-        pose_.visibility = score;
+        for (int i = 0; i < joint_num; ++i)
+        {
+            // x 方向：在 simcc_x 第 i 个关节的 extend_width 个值里找最大值
+            int max_x_pos = 0;
+            float score_x = read_value(0, simcc_x_f32, simcc_x_int8, simcc_x_fp16,
+                                       i * extend_width);
+            for (int j = 1; j < extend_width; ++j)
+            {
+                float v = read_value(0, simcc_x_f32, simcc_x_int8, simcc_x_fp16,
+                                     i * extend_width + j);
+                if (v > score_x)
+                {
+                    score_x = v;
+                    max_x_pos = j;
+                }
+            }
 
-        tmp_.key_points.push_back(pose_);
+            // y 方向：在 simcc_y 第 i 个关节的 extend_height 个值里找最大值
+            int max_y_pos = 0;
+            float score_y = read_value(1, simcc_y_f32, simcc_y_int8, simcc_y_fp16,
+                                       i * extend_height);
+            for (int j = 1; j < extend_height; ++j)
+            {
+                float v = read_value(1, simcc_y_f32, simcc_y_int8, simcc_y_fp16,
+                                     i * extend_height + j);
+                if (v > score_y)
+                {
+                    score_y = v;
+                    max_y_pos = j;
+                }
+            }
 
-        // TODO: 把 pose_ 追加到结果（如 Result::key_points）并随检测结果返回
+            // simcc 编码步长为 2，除以 2 得到模型输入坐标系下的像素坐标
+            int pose_x = max_x_pos / 2;
+            int pose_y = max_y_pos / 2;
+            const float score = (score_x + score_y) * 0.5;
+
+            KeyPoint pose_;
+            pose_.x = (static_cast<float>(pose_x) - out_w * 0.5f) * inv_scale +
+                      center_x;
+            pose_.y = (static_cast<float>(pose_y) - out_h * 0.5f) * inv_scale +
+                      center_y;
+            pose_.visibility = score;
+
+            res.key_points.push_back(pose_);
+        }
     }
-    result_.push_back(tmp_);
 }
 
 void TopdownProcess::PostProcessDetect(void **&tensors)
@@ -672,7 +646,31 @@ void TopdownProcess::PostProcessDetect(void **&tensors)
     {
         PostProcessRtmdet(tensors);
     }
+
+    // 把检测框从模型输入（letterbox 后）坐标系反算回原图坐标，
+    // 保证 get_result() 返回的 Bbox 直接就是原图上的坐标
+    // （CropImageByDetectBox / GetImageResult 均按原图坐标使用）。
+    for (auto &res : result_)
+    {
+        RecoverBoxToOriginal(res.box);
+    }
 }
+
+void TopdownProcess::RecoverBoxToOriginal(Bbox &bbox)
+{
+    // PreProcess 的 letterbox 为"等比缩放到模型输入 + 左上角对齐"，
+    // 原图坐标 = 模型输入坐标 / scale（无平移偏移）。
+    const float scale = detect_letterbox_scale_;
+    if (scale <= 0.0f)
+    {
+        return;
+    }
+    bbox.x1 /= scale;
+    bbox.y1 /= scale;
+    bbox.x2 /= scale;
+    bbox.y2 /= scale;
+}
+
 void TopdownProcess::PostProcessDetect_(void **&tensors)
 {
     int validCount = 0;

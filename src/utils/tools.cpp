@@ -229,8 +229,6 @@ cv::Mat GetImageResult(const cv::Mat &original_image,
         y1 = std::max<float>(result.box.y1, 0);
         x2 = std::max<float>(result.box.x2, 0);
         y2 = std::max<float>(result.box.y2, 0);
-        CoordinateTransformation(x1, y1, width, height, target_side_length);
-        CoordinateTransformation(x2, y2, width, height, target_side_length);
         if (!enable_track)
         {
             cv::rectangle(image, cv::Point(x1, y1), cv::Point(x2, y2),
@@ -243,6 +241,83 @@ cv::Mat GetImageResult(const cv::Mat &original_image,
             if (result.model_type == ModelType::POSE_V8)
             {
                 ProcessPoseImage(image, result, target_side_length);
+            }
+        }
+        else
+        {
+            Object object;
+            object.rect = cv::Rect(x1, y1, x2 - x1, y2 - y1);
+            object.label = result.class_id;
+            object.prob = result.obj_prob;
+            objects.push_back(object);
+        }
+    }
+    if (enable_track)
+    {
+        // static std::unique_ptr<BYTETracker> tracker = nullptr;
+        // if (tracker == nullptr)
+        // {
+        //     tracker = std::make_unique<BYTETracker>(25, 25);
+        // }
+        // std::vector<STrack> output_stracks = tracker->update(objects);
+        // for (size_t i = 0; i < output_stracks.size(); ++i)
+        // {
+        //     std::vector<float> tlwh = output_stracks[i].tlwh;
+        //     bool vertical = tlwh[2] / tlwh[3] > 1.6;
+        //     if (tlwh[2] * tlwh[3] > 20 && !vertical)
+        //     {
+        //         Scalar s = tracker->get_color(output_stracks.at(i).track_id);
+        //         putText(image, format("%d,", output_stracks.at(i).track_id),
+        //                 Point(tlwh[0], tlwh[1] - 5), 0, 0.6, Scalar(0, 0, 255), 2,
+        //                 LINE_AA);
+        //         rectangle(image, Rect(tlwh[0], tlwh[1], tlwh[2], tlwh[3]), s, 2);
+        //     }
+        // }
+    }
+    return image;
+}
+
+cv::Mat GetImageResult(const cv::Mat &original_image,
+                       const std::vector<Result> &results,
+                       std::vector<std::string> &labels,
+                       bool enable_track)
+{
+    auto image = original_image.clone();
+    int width = image.cols;
+    int height = image.rows;
+    std::vector<Object> objects;
+    for (auto result : results)
+    {
+        if (result.model_type == ModelType::SEGMENT_V11)
+        {
+            AddWeightedSegment(image, result.seg_mat, result.class_id);
+        }
+        float x1, y1, x2, y2;
+        x1 = std::max<float>(result.box.x1, 0);
+        y1 = std::max<float>(result.box.y1, 0);
+        x2 = std::max<float>(result.box.x2, 0);
+        y2 = std::max<float>(result.box.y2, 0);
+        if (!enable_track)
+        {
+            cv::rectangle(image, cv::Point(x1, y1), cv::Point(x2, y2),
+                          cv::Scalar(0, 0, 255), 2);
+            char text[256];
+            sprintf(text, "%s %.1f%%", labels.at(result.class_id).c_str(),
+                    result.obj_prob * 100);
+            cv::putText(image, text, cv::Point(x1, y1 + 20), cv::FONT_HERSHEY_COMPLEX,
+                        0.65, cv::Scalar(255, 255, 0), 1, cv::LINE_8);
+            if (result.model_type == ModelType::POSE_RTMPOSE)
+            {
+                for (const auto &keypoint : result.key_points)
+                {
+                    // 关键点已是原图坐标，直接绘制；低可见度跳过
+                    if (keypoint.visibility <= 0.6f)
+                    {
+                        continue;
+                    }
+                    cv::circle(image, cv::Point(keypoint.x, keypoint.y), 5,
+                               cv::Scalar(0, 255, 0), -1, cv::LINE_AA);
+                }
             }
         }
         else

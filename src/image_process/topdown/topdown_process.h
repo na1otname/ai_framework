@@ -42,6 +42,9 @@ private:
 
     void PostProcessRtmdet(void **&tensors);
 
+    // 把 letterbox（模型输入）坐标系下的检测框反算回原图坐标
+    void RecoverBoxToOriginal(Bbox &bbox);
+
     uint16_t ProcessRtmdet(const void *box_tensor, const void *score_tensor,
                            const void *sum_score_tensor, int grid_w, int grid_h,
                            int stride, int index, int output_per_branch);
@@ -85,6 +88,9 @@ private:
     ModelType keypoint_model_type_;
 
     float iou_threshold_;
+    // letterbox 缩放因子（模型输入边长 / 原图最长边），最近一次 PreProcess 设置，
+    // 用于把检测框从模型输入坐标系反算回原图坐标（左上角对齐，无平移偏移）
+    float detect_letterbox_scale_{1.0f};
     uint16_t detect_num_of_layers_;
     uint16_t keypoints_num_of_layers_;
 

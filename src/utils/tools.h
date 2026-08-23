@@ -15,6 +15,10 @@ cv::Mat GetImageResult(const cv::Mat &original_image,
                        const std::vector<Result> &results,
                        std::vector<std::string> &labels,
                        bool enable_track = false);
+cv::Mat GetImageResult(const cv::Mat &original_image,
+                       const std::vector<Result> &results,
+                       std::vector<std::string> &labels,
+                       bool enable_track = false);
 
 void AddWeightedSegment(cv::Mat &image, const cv::Mat &seg_mat, int id);
 
