@@ -27,7 +27,7 @@ TopdownProcess::TopdownProcess(const ai_framework::Config &detect_config,
     for (size_t i = 0; i < detect_num_of_layers_; ++i)
     {
         auto layer = detect_config.output_index_to_name.at(i);
-        LOG_INFO("Post Index = {}, layer name = {}", i, layer);
+        // LOG_INFO("Post Index = {}, layer name = {}", i, layer);
         detect_output_layer_names_.push_back(layer);
         detect_output_layer_shape.push_back(detect_config.output_layer_shape.at(layer));
         detect_output_element_count_.push_back(detect_config.output_element_count.at(layer));
@@ -44,7 +44,7 @@ TopdownProcess::TopdownProcess(const ai_framework::Config &detect_config,
     for (size_t i = 0; i < keypoint_config.output_tensors_count; ++i)
     {
         auto layer = keypoint_config.output_index_to_name.at(i);
-        LOG_INFO("Post Index = {}, layer name = {}", i, layer);
+        // LOG_INFO("Post Index = {}, layer name = {}", i, layer);
         keypoints_output_layer_names_.push_back(layer);
         keypoints_output_layer_shape.push_back(keypoint_config.output_layer_shape.at(layer));
         keypoints_output_element_count_.push_back(keypoint_config.output_element_count.at(layer));
@@ -113,7 +113,7 @@ void TopdownProcess::InitModelType(const std::string &output_name, ModelType &mo
         modeltype_ = ModelType::POSE_RTMPOSE;
     }
 
-    LOG_INFO("ModelType: {}", modeltype_);
+    // LOG_INFO("ModelType: {}", modeltype_);
 }
 
 void TopdownProcess::GetInputSize(const ai_framework::Config &config,

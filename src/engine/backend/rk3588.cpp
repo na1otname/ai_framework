@@ -111,11 +111,11 @@ Rk3588::~Rk3588()
         free(output_tmp_attr_);
         output_tmp_attr_ = nullptr;
     }
-    // tensor_data_ptr_ 是借用指针，不拥有其生命周期。
     tensor_data_ptr_ = nullptr;
     if (ctx_ != 0)
     {
         rknn_destroy(ctx_);
+        ctx_ = 0;
     }
 }
 

@@ -8,8 +8,8 @@
 #include <opencv2/opencv.hpp>
 
 #include "engine/ai_instance.h"
-#include "detection/detection_postprocess.h"
-#include "detection/detection_preprocess.h"
+#include "detection/postprocess.h"
+#include "detection/preprocess.h"
 #include "topdown/topdown_process.h"
 #include "utils/tools.h"
 
@@ -25,6 +25,7 @@ int main(int, char **)
 
     std::unique_ptr<ai_framework::Engine> detect_engine =
         std::make_unique<ai_framework::Engine>(detect_model_path);
+
     std::unique_ptr<ai_framework::Engine> keypoint_engine =
         std::make_unique<ai_framework::Engine>(keypoint_model_path);
 
@@ -57,7 +58,7 @@ int main(int, char **)
     cv::Mat frame_result = GetImageResult(frame, result_, labels);
     // cv::imshow("test", frame_result);
     // cv::waitKey(0);
-    // cv::imwrite("/home/orangepi/Code/ai_framework/source/result.jpg", frame_result);
+    cv::imwrite("/home/orangepi/Code/ai_framework/source/result.jpg", frame_result);
 
     // topdownprocess_ptr_->
     return 0;

@@ -14,6 +14,7 @@
 
 class ThreadPool
 {
+public:
     ThreadPool(size_t);
 
     template <class F, class... Args>
@@ -24,6 +25,7 @@ class ThreadPool
     bool IsTasksEmpty();
     int TasksSize();
 
+private:
     // need to keep track of threads so we can join them
     std::vector<std::thread> workers;
     // the task queue

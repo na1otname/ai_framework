@@ -7,8 +7,8 @@
 #include <opencv2/opencv.hpp>
 
 #include "engine/ai_instance.h"
-#include "detection_postprocess.h"
-#include "detection_preprocess.h"
+#include "postprocess.h"
+#include "preprocess.h"
 #include "utils/tools.h"
 
 int main()
@@ -17,10 +17,10 @@ int main()
     const char *model_path =
         "/home/orangepi/Code/ai_framework/model/rtmdet_nano_320x320_static_int8.rknn";
     printf("[1/6] Loading model: %s\n", model_path);
-    auto engine = ai_framework::Engine(model_path);
+    auto engine = std::make_unique<ai_framework::Engine>(model_path);
 
-    auto input = engine.get_input_tensor_ptr();
-    auto output = engine.get_output_tensor_ptr();
+    auto input = engine->get_input_tensor_ptr();
+    auto output = engine->get_output_tensor_ptr();
 
     const char *image_path = "/home/orangepi/Code/ai_framework/source/test.jpg";
     cv::Mat frame = cv::imread(image_path);
@@ -28,9 +28,9 @@ int main()
 
     preprocessor.Run({frame}, input);
     std::vector<float> conf_threshold = {0.4f};
-    PostProcess postprocessor(engine.get_config(), conf_threshold, 0.4f, 0.4f);
+    PostProcess postprocessor(engine->get_config(), conf_threshold, 0.4f, 0.4f);
 
-    engine.DoInference();
+    engine->DoInference();
     postprocessor.Run(output);
 
     std::vector<Result> result = postprocessor.get_result();

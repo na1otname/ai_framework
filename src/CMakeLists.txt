@@ -2,6 +2,9 @@ project(ai_framework)
 
 add_executable(${PROJECT_NAME} main.cpp )
 
+
+target_compile_definitions(ai_framework PRIVATE RK3588=1)
+
 add_subdirectory(engine)
 add_subdirectory(image_process)
 

@@ -6,22 +6,20 @@
 
 namespace ai_framework
 {
-   
-    Engine::Engine( const char *model_path)
+
+    Engine::Engine(const char *model_path)
     {
 
 #ifdef RK3588
-
-       instance_ptr_ =std::make_shared<Rk3588>();
+        instance_ptr_ = std::make_shared<Rk3588>();
 #endif
 
 #ifdef ONNXRUNTIME
-
-        instance_ptr_ =std::make_shared<OnnxRuntime>();
+        instance_ptr_ = std::make_shared<OnnxRuntime>();
 #endif
 
 #ifdef TRT
-       instance_ptr_ =std::make_shared<TensorRT>();
+        instance_ptr_ = std::make_shared<TensorRT>();
 #endif
 
         // instance_ptr_ = CreateBackend(format);

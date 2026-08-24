@@ -8,6 +8,8 @@ add_executable(test_ai_framework
     ${UTILS}
 )
 
+target_compile_definitions(test_ai_framework PRIVATE RK3588=1)
+
 
 
 

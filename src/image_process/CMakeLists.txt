@@ -1,13 +1,12 @@
-add_library(detection_preprocess detection/detection_preprocess.cpp)
+add_library(detection_preprocess detection/preprocess.cpp)
 target_compile_definitions(detection_preprocess PRIVATE RK3588=1)
 target_include_directories(detection_preprocess
 	PUBLIC
 		${OpenCV_INCLUDE_DIRS}
 		${RGA_API_INCLUDE_PATH}
 		${CMAKE_CURRENT_SOURCE_DIR}
-		
-
 )
+
 target_link_libraries(detection_preprocess
 	PUBLIC
 		${RGA_API_LIB_PATH}
@@ -15,7 +14,7 @@ target_link_libraries(detection_preprocess
 )
 
 add_library(detection_postprocess 
-	detection/detection_postprocess.cpp
+	detection/postprocess.cpp
 	topdown/topdown_process.h
 	topdown/topdown_process.cpp
 	${UTILS})
