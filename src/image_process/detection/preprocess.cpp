@@ -17,6 +17,13 @@ void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
     for (size_t i = 0; i < input.size(); ++i)
     {
         auto &original_input = input.at(i);
+        if (original_input.empty() || original_input.type() != CV_8UC3)
+        {
+            LOG_ERROR("[PreProcess] invalid input image: index={} empty={} rows={} cols={} type={}",
+                      i, original_input.empty(), original_input.rows,
+                      original_input.cols, original_input.type());
+            return;
+        }
         int resize_width = target_side_length_;
         int resize_height = target_side_length_;
         if (original_input.cols >= original_input.rows)
@@ -35,9 +42,12 @@ void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
         // 用户态虚拟地址）；makeBorder 仅 RGA2 支持、且 RGA2 无 IOMMU，故不用。
         const size_t out_size =
             (size_t)target_side_length_ * target_side_length_ * 3;
+        const int src_wstride = (original_input.cols + 15) & ~15;
+        cv::Mat rga_input(original_input.rows, src_wstride, CV_8UC3);
+        original_input.copyTo(
+            rga_input(cv::Rect(0, 0, original_input.cols, original_input.rows)));
         rga_buffer_handle_t src_handle = importbuffer_virtualaddr(
-            (void *)original_input.data,
-            (int)(original_input.step * original_input.rows));
+            (void *)rga_input.data, (int)(rga_input.step * rga_input.rows));
         rga_buffer_handle_t out_handle =
             importbuffer_virtualaddr(tensors[i], (int)out_size);
         if (!src_handle || !out_handle)
@@ -51,7 +61,7 @@ void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
         }
         rga_buffer_t src_rga = wrapbuffer_handle(
             src_handle, original_input.cols, original_input.rows,
-            RK_FORMAT_BGR_888);
+            RK_FORMAT_BGR_888, src_wstride, original_input.rows);
         rga_buffer_t out_rga = wrapbuffer_handle(
             out_handle, target_side_length_, target_side_length_,
             RK_FORMAT_RGB_888);
@@ -68,12 +78,29 @@ void PreProcess::Run(const std::vector<cv::Mat> &input, void *tensors[])
         opt.core = IM_SCHEDULER_RGA3_CORE0; // 强制走 RGA3
         im_rect srect = {0, 0, original_input.cols, original_input.rows};
         im_rect drect = {0, 0, resize_width, resize_height};
+        IM_STATUS check = imcheck(src_rga, out_rga, srect, drect);
+        if (check != IM_STATUS_SUCCESS && check != IM_STATUS_NOERROR)
+        {
+            LOG_ERROR("[PreProcess] imcheck failed, status={} src={}x{} dst={}x{}",
+                      check, original_input.cols, original_input.rows,
+                      resize_width, resize_height);
+            releasebuffer_handle(src_handle);
+            releasebuffer_handle(out_handle);
+            return;
+        }
         IM_STATUS st_proc = improcess(src_rga, out_rga, rga_buffer_t(), srect,
                                       drect, im_rect(), -1, nullptr, &opt, 0);
         if (st_proc != IM_STATUS_SUCCESS)
         {
-            LOG_ERROR("[PreProcess] improcess failed, status=%d\n",
-                      (int)st_proc);
+            LOG_ERROR(
+                "[PreProcess] improcess failed, status={} src={}x{} stride={} "
+                "dst={}x{} resize={}x{}",
+                st_proc, original_input.cols, original_input.rows,
+                src_wstride,
+                target_side_length_, target_side_length_, resize_width,
+                resize_height);
+            releasebuffer_handle(src_handle);
+            releasebuffer_handle(out_handle);
             return;
         }
         releasebuffer_handle(src_handle);

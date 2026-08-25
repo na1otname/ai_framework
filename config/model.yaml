@@ -1,0 +1,5 @@
+model_path: "../model/rtmdet_nano_320x320_static_fp16.rknn"
+video_path: "../source/videos/2026-08-25 224156.mp4"
+video_play_fps: 25
+thread_num: 24
+cv_show: true

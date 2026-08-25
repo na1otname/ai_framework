@@ -21,6 +21,8 @@ set(LIB_ARCH "aarch64")
 set(DEVICE_NAME "RK3588")
 
 find_package(OpenCV REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
 
 include(CTest)
 enable_testing()
@@ -31,8 +33,24 @@ file(GLOB_RECURSE UTILS "src/utils/*.cpp")
 # 供 test 使用的共享目录变量，必须在 add_subdirectory(test) 之前定义
 set(IMAGE_PROCESS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/image_process)
 
+set(RKNN_API_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rknn/Linux/librknn_api)
+set(RKNN_API_INCLUDE_PATH ${RKNN_API_PATH}/include)
+set(RKNN_API_LIB_PATH ${RKNN_API_PATH}/${LIB_ARCH}/librknnrt.so)
+
+set(RGA_API_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rga)
+set(RGA_API_INCLUDE_PATH ${RGA_API_PATH}/include)
+set(RGA_API_LIB_PATH ${RGA_API_PATH}/libs/Linux/gcc-${LIB_ARCH}/librga.so)
+
+set(TIME_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+
+include_directories(
+    ${OpenCV_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 # 添加测试项目
 add_subdirectory(test/rtmdet_test)
+add_subdirectory(test/threadpool_test)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
@@ -44,25 +62,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 # set(Eingine_INCLUDE ${CMAKE_SOURCE_DIR}/src/engine)
 set(Rtmdet_INCLUDE ${CMAKE_SOURCE_DIR}/src/rtmdet)
-
-#  rknn_api 文件夹路径
-set(RKNN_API_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rknn/Linux/librknn_api)
-#  rknn_api include 路径
-set(RKNN_API_INCLUDE_PATH ${RKNN_API_PATH}/include)
-#  rknn_api lib 路径
-set(RKNN_API_LIB_PATH ${RKNN_API_PATH}/${LIB_ARCH}/librknnrt.so)
-
-set(RGA_API_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rga)
-set(RGA_API_INCLUDE_PATH ${RGA_API_PATH}/include)
-set(RGA_API_LIB_PATH ${RGA_API_PATH}/libs/Linux/gcc-${LIB_ARCH}/librga.so)
-
-# 用来搜索头文件的目录
-include_directories(
-    ${OpenCV_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
-
 
 add_subdirectory(src)
 

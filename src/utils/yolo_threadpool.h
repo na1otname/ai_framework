@@ -1,5 +1,8 @@
 #pragma once
-#include "ai_instance.h"
+#include "../engine/ai_framework.h"
+#ifdef RK3588
+#include "../engine/backend/rk3588.h"
+#endif
 #include "image_process/detection/preprocess.h"
 #include "image_process/detection/postprocess.h"
 #include "threadpool.h"
@@ -45,7 +48,7 @@ public:
 
     const uint32_t &get_drop_count() const { return drop_count_; }
 
-    const int &get_model_input_side_lenght() const { return yolo_preprocess_.at(0)->get_target_side_length(); }
+    const int &get_model_input_side_length() const { return yolo_preprocess_.at(0)->get_target_side_length(); }
 
 private:
     template <class T>

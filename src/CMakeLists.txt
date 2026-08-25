@@ -11,15 +11,18 @@ add_subdirectory(image_process)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${IMAGE_PROCESS_DIR}
-    ${CMAKE_SOURCE_DIR}/src)
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/utils)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC     
     engine
     ${RKNN_API_LIB_PATH}
     ${RGA_API_LIB_PATH}
-    	${UTILS}
+    -Wl,--whole-archive
+    detection_preprocess
+    detection_postprocess
+    -Wl,--no-whole-archive
     spdlog
     fmt
     systemd
-    detection_preprocess
-    detection_postprocess)
+)

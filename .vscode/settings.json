@@ -1,3 +1,9 @@
 {
-    "C_Cpp.default.compilerPath": "/usr/bin/gcc-12"
+    "C_Cpp.default.compilerPath": "/usr/bin/gcc-12",
+    "chat.tools.terminal.autoApprove": {
+        "/^cmake --build /home/orangepi/Code/ai_framework/build --config Debug --target all -j 8$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }
