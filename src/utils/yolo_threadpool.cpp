@@ -72,6 +72,11 @@ YoloThreadPool::YoloThreadPool(const char *model_data,
     Initialize(model_data, model_size, model_extension, conf_threshold, threads);
 }
 
+YoloThreadPool::~YoloThreadPool()
+{
+    pool_.reset();
+}
+
 YoloThreadPool::YoloThreadPool(std::string &model_path,
                                std::vector<float> &conf_threshold,
                                int threads)
@@ -108,10 +113,14 @@ void YoloThreadPool::AddInferenceTask(
         {
             auto id = this->get_thread_id();
             std::lock_guard<std::mutex> lock_threads(this->threads_mutex_[id]);
-            this->yolo_preprocess_.at(id)->Run(image, this->tensors_data_.at(id)->get_input_tensor_ptr());
+            // this->yolo_preprocess_.at(id)->Run(image, this->tensors_data_.at(id)->get_input_tensor_ptr());
+            TIME_COST_DEBUG("PreProcess()",
+                            this->yolo_preprocess_.at(id)->Run(image, this->tensors_data_.at(id)->get_input_tensor_ptr()));
             TIME_COST_DEBUG("DoInference()",
                             this->instances_.at(id)->DoInference());
-            this->yolo_postprocess_.at(id)->Run(this->tensors_data_.at(id)->get_output_tensor_ptr());
+            // this->yolo_postprocess_.at(id)->Run(this->tensors_data_.at(id)->get_output_tensor_ptr());
+            TIME_COST_DEBUG("PostProcess()",
+                            this->yolo_postprocess_.at(id)->Run(this->tensors_data_.at(id)->get_output_tensor_ptr()));
             std::unique_lock<std::mutex> lock(this->result_queue_mutex_);
             if (!yolo_inference_result_queue_.empty())
             {

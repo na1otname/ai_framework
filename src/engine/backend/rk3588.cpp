@@ -1,6 +1,7 @@
 #include "rk3588.h"
 #include <cstring>
 #include <cstdlib>
+#include <stdexcept>
 
 const int RK3588_CORE_NUM = 3;
 
@@ -142,7 +143,8 @@ void Rk3588::Initialize(const char *model_data, const uint64_t size)
     }
 
     config_.model_name_path = "memory_buffer";
-    QueryAndConfigureRuntime();
+    if (!QueryAndConfigureRuntime())
+        throw std::runtime_error("RKNN runtime configuration failed");
 }
 
 // 方式 B：从文件路径初始化
@@ -165,7 +167,19 @@ void Rk3588::Initialize(const char *model_path)
         }
         fseek(fp, 0, SEEK_END);
         int model_len = ftell(fp);
+        if (model_len <= 0)
+        {
+            LOG_ERROR("invalid model size for {}", model_path);
+            fclose(fp);
+            return;
+        }
         unsigned char *model = (unsigned char *)malloc(model_len);
+        if (model == nullptr)
+        {
+            LOG_ERROR("malloc model buffer failed for {}", model_path);
+            fclose(fp);
+            return;
+        }
         fseek(fp, 0, SEEK_SET);
         if (model_len != (int)fread(model, 1, model_len, fp))
         {
@@ -187,7 +201,8 @@ void Rk3588::Initialize(const char *model_path)
     }
 
     config_.model_name_path = model_path;
-    QueryAndConfigureRuntime();
+    if (!QueryAndConfigureRuntime())
+        throw std::runtime_error("RKNN runtime configuration failed");
 }
 
 // 核心公共提取函数：处理多NPU绑定、IO属性查询、结构体赋值
@@ -235,6 +250,8 @@ bool Rk3588::QueryAndConfigureRuntime()
 
     // 4. 分配并查询输入属性
     input_attr_ = (rknn_tensor_attr *)malloc(io_num.n_input * sizeof(rknn_tensor_attr));
+    if (io_num.n_input > 0 && input_attr_ == nullptr)
+        return false;
     memset(input_attr_, 0, io_num.n_input * sizeof(rknn_tensor_attr));
     for (uint32_t i = 0; i < io_num.n_input; i++)
     {
@@ -254,11 +271,15 @@ bool Rk3588::QueryAndConfigureRuntime()
 
     // 5. 分配并查询输出属性
     output_attr_ = (rknn_tensor_attr *)malloc(io_num.n_output * sizeof(rknn_tensor_attr));
+    if (io_num.n_output > 0 && output_attr_ == nullptr)
+        return false;
     memset(output_attr_, 0, io_num.n_output * sizeof(rknn_tensor_attr));
 
     if (zero_copy_)
     {
         output_tmp_attr_ = (rknn_tensor_attr *)malloc(io_num.n_output * sizeof(rknn_tensor_attr));
+        if (io_num.n_output > 0 && output_tmp_attr_ == nullptr)
+            return false;
         memset(output_tmp_attr_, 0, io_num.n_output * sizeof(rknn_tensor_attr));
     }
 
@@ -378,7 +399,7 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
             if (input_mem[i] == nullptr)
             {
                 LOG_ERROR("rknn_create_mem(input[{}], size={}) failed!", i, input_attr_[i].size_with_stride);
-                continue;
+                throw std::runtime_error("RKNN input memory allocation failed");
             }
 
             int ret = rknn_set_io_mem(ctx_, input_mem[i], &input_attr_[i]);
@@ -386,7 +407,9 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
             if (ret < 0)
             {
                 LOG_ERROR("rknn_set_io_mem(input[{}]) fail! ret={}", i, ret);
-                continue;
+                rknn_destroy_mem(ctx_, input_mem[i]);
+                input_mem[i] = nullptr;
+                throw std::runtime_error("RKNN input memory binding failed");
             }
 
             LOG_DEBUG("zero-copy input mem[{}]: virt={} fd={} size={} fmt={}",
@@ -408,13 +431,15 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
             if (output_mem[i] == nullptr)
             {
                 LOG_ERROR("rknn_create_mem(output[{}], size={}) failed!", i, output_attr_[i].size_with_stride);
-                continue;
+                throw std::runtime_error("RKNN output memory allocation failed");
             }
             int ret = rknn_set_io_mem(ctx_, output_mem[i], &output_attr_[i]);
             if (ret < 0)
             {
                 LOG_ERROR("rknn_set_io_mem(output[{}]) fail! ret={}", i, ret);
-                continue;
+                rknn_destroy_mem(ctx_, output_mem[i]);
+                output_mem[i] = nullptr;
+                throw std::runtime_error("RKNN output memory binding failed");
             }
             LOG_DEBUG("zero-copy output mem[{}]: virt={} fd={} size={} fmt={} ",
                       i,
@@ -430,9 +455,13 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
     else
     {
         input_ = (rknn_input *)malloc(config_.input_tensors_count * sizeof(rknn_input));
+        if (config_.input_tensors_count > 0 && input_ == nullptr)
+            throw std::bad_alloc();
         memset(input_, 0, config_.input_tensors_count * sizeof(rknn_input));
 
         output_ = (rknn_output *)malloc(config_.output_tensors_count * sizeof(rknn_output));
+        if (config_.output_tensors_count > 0 && output_ == nullptr)
+            throw std::bad_alloc();
         memset(output_, 0, config_.output_tensors_count * sizeof(rknn_output));
 
         for (size_t i = 0; i < config_.input_tensors_count; ++i)
@@ -446,7 +475,7 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
             if (buffer == nullptr)
             {
                 LOG_ERROR("malloc CPU buffer failed for input tensor [{}] size={}", i, input_attr_[i].size);
-                continue;
+                throw std::bad_alloc();
             }
             memset(buffer, 0, input_attr_[i].size);
             input_[i].buf = buffer;
@@ -465,7 +494,7 @@ void Rk3588::BindInputAndOutput(ai_framework::TensorData &tensor_data)
             if (buffer == nullptr)
             {
                 LOG_ERROR("malloc CPU buffer failed for output tensor [{}] size={}", i, output_attr_[i].size);
-                continue;
+                throw std::bad_alloc();
             }
             memset(buffer, 0, output_attr_[i].size);
             output_[i].buf = buffer;
@@ -512,6 +541,11 @@ void Rk3588::DoInference()
                 const int w = static_cast<int>(shape[3]);
 
                 void *temp_buffer = malloc(output_tmp_attr_[i].size_with_stride);
+                if (temp_buffer == nullptr)
+                {
+                    LOG_ERROR("malloc temporary output buffer failed for tensor [{}]", i);
+                    return;
+                }
 
                 // LOG_INFO("NCHW size:{}", output_tmp_attr_[i].size_with_stride);
                 NC1HWC2_to_NCHW(type_str, zero_copy_buf, temp_buffer, dims, channel, h, w);

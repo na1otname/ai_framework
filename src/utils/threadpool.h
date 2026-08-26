@@ -40,6 +40,9 @@ private:
 // the constructor just launches some amount of workers
 inline ThreadPool::ThreadPool(size_t threads) : stop(false)
 {
+    if (threads == 0)
+        throw std::invalid_argument("ThreadPool requires at least one worker");
+
     for (size_t i = 0; i < threads; ++i)
         workers.emplace_back([this]
                              {

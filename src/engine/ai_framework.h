@@ -41,6 +41,8 @@ namespace ai_framework
         TensorData() = delete;
         TensorData(const Config &config);
         ~TensorData();
+        TensorData(const TensorData &) = delete;
+        TensorData &operator=(const TensorData &) = delete;
         void **&get_input_tensor_ptr() { return input_tensor_ptr_; }
         void **&get_output_tensor_ptr() { return output_tensor_ptr_; }
 #ifdef TRT

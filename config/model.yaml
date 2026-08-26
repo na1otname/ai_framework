@@ -1,5 +1,7 @@
 model_path: "../model/rtmdet_nano_320x320_static_fp16.rknn"
-video_path: "../source/videos/2026-08-25 224156.mp4"
-video_play_fps: 25
-thread_num: 24
-cv_show: true
+video_path: "../source/videos/2026-08-25224156.mp4"
+# model_path: "/home/orangepi/Code/inference-rknn/resources/yolov8/yolov8n.rknn"
+# video_path: "/home/orangepi/Code/yolov8-rknn/resources/video/palace.mp4"
+video_play_fps: 30
+thread_num: 12
+cv_show: false

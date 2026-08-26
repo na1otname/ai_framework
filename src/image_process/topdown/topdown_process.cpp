@@ -193,6 +193,10 @@ void TopdownProcess::PreProcess(const std::vector<cv::Mat> &input, void *tensors
                     "out=%d) tensors[%zu]=%p out_size=%zu src_size=%d\n",
                     (int)src_handle, (int)out_handle, i, tensors[i], out_size,
                     (int)(original_input.step * original_input.rows));
+            if (src_handle)
+                releasebuffer_handle(src_handle);
+            if (out_handle)
+                releasebuffer_handle(out_handle);
             return;
         }
         rga_buffer_t src_rga = wrapbuffer_handle(
@@ -220,6 +224,8 @@ void TopdownProcess::PreProcess(const std::vector<cv::Mat> &input, void *tensors
         {
             fprintf(stderr, "[PreProcess] improcess failed, status=%d\n",
                     (int)st_proc);
+            releasebuffer_handle(src_handle);
+            releasebuffer_handle(out_handle);
             return;
         }
         releasebuffer_handle(src_handle);

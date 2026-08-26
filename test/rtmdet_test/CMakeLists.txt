@@ -37,7 +37,7 @@ target_link_libraries(test_ai_framework PRIVATE
 )
 # 注册 CTest 测试
 add_test(NAME OpenMMLabTest
-    COMMAND test_openmmlab
+    COMMAND test_ai_framework
 )
 
 # 可选：设置测试超时（秒）

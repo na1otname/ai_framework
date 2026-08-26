@@ -38,7 +38,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 # 注册 CTest 测试
 add_test(NAME ThreadPoolTest
-    COMMAND test_threadpool
+    COMMAND TEST_THREADPOOL
 )
 
 # 可选：设置测试超时（秒）

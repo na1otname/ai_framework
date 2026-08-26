@@ -30,6 +30,8 @@ public:
                    std::vector<float> &conf_threshold,
                    int threads = 1);
 
+    ~YoloThreadPool();
+
     void Initialize(const char *model_data, const uint64_t model_size,
                     const std::string model_extension,
                     std::vector<float> &conf_threshold, int threads = 1);
