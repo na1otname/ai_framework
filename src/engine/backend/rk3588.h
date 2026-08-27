@@ -36,6 +36,7 @@ private:
     rknn_tensor_attr *input_attr_{nullptr};
     rknn_tensor_attr *output_attr_{nullptr};
     rknn_tensor_attr *output_tmp_attr_{nullptr};
+    std::vector<void *> output_nchw_buffers_;
     bool zero_copy_{true};
     rknn_tensor_type input_type_{RKNN_TENSOR_UINT8};
     ai_framework::TensorData *tensor_data_ptr_{nullptr};

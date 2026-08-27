@@ -1,4 +1,4 @@
-model_path: "../model/rtmdet_nano_320x320_static_fp16.rknn"
+model_path: "../model/rtmdet_tiny_8xb32-300e_coco_int8.rknn"
 video_path: "../source/videos/2026-08-25224156.mp4"
 # model_path: "/home/orangepi/Code/inference-rknn/resources/yolov8/yolov8n.rknn"
 # video_path: "/home/orangepi/Code/yolov8-rknn/resources/video/palace.mp4"
